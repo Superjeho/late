@@ -39,6 +39,21 @@
       </ul>
     </div>
 
+    <div class="field has-addons">
+      <div class="control is-expanded">
+        <input
+          type="text"
+          class="input"
+          placeholder="(coming soon) Read Textbook for Data Structures due next Thursday"
+        >
+      </div>
+      <div class="control">
+        <button class="button">
+          Quick Add
+        </button>
+      </div>
+    </div>
+
     <AssessmentsFilterModal
       :open="filtersModalOpen"
       :filter="hiddenCourseCRNs"
