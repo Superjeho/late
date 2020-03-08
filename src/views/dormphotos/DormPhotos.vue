@@ -9,12 +9,21 @@
       @open-submit-photo-modal="submittingPhoto=true"
     />
 
-    <div class="buttons">
+    <div class="buttons field has-addons">
+      <router-link
+        v-if="$route.name === 'dorm-photos'"
+        class="button is-link"
+        :to="{name: 'tools'}"
+      >
+        <i class="fas fa-angle-left" />
+        All Tools
+      </router-link>
       <router-link
         v-if="$route.name !== 'dorm-photos'"
         :to="{name: 'dorm-photos'}"
         class="button is-link"
       >
+        <i class="fas fa-angle-left" />
         Back
       </router-link>
       <router-link
@@ -106,5 +115,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+
+.button i.fas,.instructions li .fas {
+  margin-right: 5px;
+}
 
 </style>

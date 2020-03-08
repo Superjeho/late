@@ -6,7 +6,7 @@
       :can-cancel="false"
     />
 
-    <h2 class="subtitle is-size-4">
+    <h2 class="title">
       {{ dorm.name }}
     </h2>
 

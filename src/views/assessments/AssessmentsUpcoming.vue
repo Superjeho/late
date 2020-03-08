@@ -28,30 +28,14 @@
               'has-background-dark has-text-white': groupBy === 'date'
             }"
             :style="headerStyle(key)"
+            @click="headerClick(key)"
           >
             <span
               class="key"
               :class="groupBy"
               :title="headerTitle(key)"
-              @click="headerClick(key)"
             >{{ headerText(key) }}</span>
             <!-- <span class="tag is-danger is-pulled-right day-weight-tag">Light</span> -->
-            <span class="add-assessment-buttons">
-              <span
-                class="tag icon is-pulled-right"
-                :title="addAssessmentTitle(key, 'assignment')"
-                @click="addAssessmentClick(key, 'assignment')"
-              >
-                <i class="fas fa-clipboard-check" />
-              </span>
-              <span
-                class="tag icon is-pulled-right"
-                :title="addAssessmentTitle(key, 'exam')"
-                @click="addAssessmentClick(key, 'exam')"
-              >
-                <i class="fas fa-exclamation-triangle" />
-              </span>
-            </span>
           </p>
           <AssessmentPanelBlock
             v-for="a in assessments"
@@ -240,38 +224,21 @@ export default {
     cursor: pointer;
   }
 
-  .add-assessment-buttons {
-    position: absolute;
-
-    right: 10px;
-
-    transition: opacity 0.1s;
-    @media only screen and (min-width: 768px) {
-      opacity: 0;
-    }
-    span {
-      background-color: white;
-      width: 45px;
-      margin: 2px;
-      border-radius: 4px;
-      cursor: pointer;
-      i {
-        font-size: 15px;
-        color: #2e3b59;
-      }
-    }
-    @media only screen and (max-width: 768px) {
-      span { width: 55px; }
-    }
-    span:hover {
-      background-color: rgb(230, 230, 230);
-    }
-  }
-
   &:hover {
     .add-assessment-buttons {
+      display:inherit;
       opacity: 1;
     }
   }
+}
+
+.panel-heading {
+  cursor: pointer;
+  font-size: 1.15em;
+}
+
+.panel-heading:hover {
+  filter: saturate(1.1) brightness(1.1);
+  transition: filter 0.2s;
 }
 </style>

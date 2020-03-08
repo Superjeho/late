@@ -161,7 +161,10 @@ export default {
 
 <style lang="scss" scoped>
 .grade-anchors {
-  margin: 0;
+  font-size: 1.3em;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .card-image {
@@ -194,5 +197,9 @@ export default {
   font-size: 1.5rem;
   display: inline-block;
   margin-bottom: 0.5em;
+}
+
+.box .columns  {
+  position: relative;
 }
 </style>
