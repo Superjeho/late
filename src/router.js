@@ -94,6 +94,15 @@ const router = new Router({
       ]
     },
     {
+      path: '/semestergoals',
+      name: 'semester-goals',
+      meta: {
+        title: 'Semester Goals'
+      },
+      component: () =>
+        import('@/views/tools/SemesterGoals.vue')
+    },
+    {
       path: '/studytools',
       name: 'study-tools',
       component: () => import('@/views/studytools/StudyToolsPage.vue'),
