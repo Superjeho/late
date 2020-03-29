@@ -13,7 +13,7 @@
       <div :class="appClass">
         <span
           v-if="!sidebarExpanded"
-          class="tag icon toggle-sidebar has-text-dark"
+          class="button icon toggle-sidebar has-text-dark"
           title="Open sidebar"
           @click="$store.commit('TOGGLE_SIDEBAR')"
         >
@@ -337,15 +337,18 @@ section.section {
   top: 60px;
   font-size: 30px;
   i {
+    transition: 0.2s;
     font-size: 15px;
   }
 }
 .toggle-sidebar:hover {
+  width: 70px!important;
+  height: 40px!important;
   transition: 0.2s !important;
   transition-timing-function: ease-out;
-  background-color: whitesmoke;
+  background: whitesmoke;
   i {
-    transform: translateX(2px);
+    transform: rotate(60deg);
   }
 }
 

@@ -530,7 +530,7 @@ export default {
   padding: 0;
 
   .announcement-icon {
-    padding: 0.5rem 0.2rem;
+    padding: 0.5rem 1rem;
   }
 
   span.tag.assignment-count,
@@ -540,6 +540,11 @@ export default {
     padding-right: 5px;
     margin-left: 7px;
   }
+}
+
+.navbar.is-dark {
+  -webkit-backdrop-filter: blur(3px) brightness(0.4)!important;
+  background-color: rgba(26,39,69,0.8)!important;
 }
 
 //Mobile dropdown mediaquery
@@ -562,6 +567,7 @@ export default {
   }
   //Shift all child items to right and add border
   .navbar-item {
+    -webkit-backdrop-filter: blur(3px) brightness(0.4)!important;
     &.has-dropdown {
       .navbar-dropdown {
         border-left: 1px solid black;
