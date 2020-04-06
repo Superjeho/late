@@ -311,11 +311,6 @@ export default {
         return
       }
 
-      // if auto assign enabled, add assignment to valid time block
-      if (this.autoSchedule) {
-        this.autoAssign()
-      }
-
       // Update global state if they are not in the past
       if (
         moment(request.data.createdAssignment.dueDate).isAfter(
@@ -383,7 +378,7 @@ export default {
       return parseInt(Math.abs(endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24))
     },
     parseStringTime (time) {
-      if (!(typeof time === 'string')) {
+      if (typeof time !== 'string') {
         return time
       }
       time.split(':')
@@ -407,6 +402,7 @@ export default {
         return this.getDifferenceInDays(currentDate, new Date(assessment.dueDate))
       }))
 
+      // init day table
       const dayTable = []
       for (let i = 0; i < furthestDueDate; i++) {
         dayTable.push([])
@@ -418,7 +414,20 @@ export default {
           dayTable[i].push([this.parseStringTime(uDay.startTime),
             this.parseStringTime(uDay.endTime)])
         }
+
+        for (let j = 0; j < courses.length; j++) {
+          const periods = courses[j].periods
+          for (let k = 0; k < periods.length; k++) {
+            const period = periods[k]
+            if (period.day === i) {
+              dayTable[i].push([this.parseStringTime(period.startTime),
+                this.parseStringTime(period.endTime)])
+            }
+          }
+        }
       }
+
+      console.log(assessments)
       console.log(dayTable)
     }
   }
