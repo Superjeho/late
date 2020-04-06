@@ -373,9 +373,21 @@ export default {
           })
         }
       })
+
+      // if auto assign enabled, add assignment to valid time block
+      if (this.autoSchedule) {
+        this.autoAssign()
+      }
     },
     getDifferenceInDays (startDate, endDate) {
       return parseInt(Math.abs(endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24))
+    },
+    parseStringTime (time) {
+      if (!(typeof time === 'string')) {
+        return time
+      }
+      time.split(':')
+      return parseInt(time[0] + time[1])
     },
     autoAssign () {
       /*
@@ -391,19 +403,23 @@ export default {
 
       // find latest due date
       const currentDate = new Date()
-      const latest = Math.max(...assessments.map(assessment => {
+      const furthestDueDate = Math.max(...assessments.map(assessment => {
         return this.getDifferenceInDays(currentDate, new Date(assessment.dueDate))
       }))
 
-      // create a new day reprsentation in a table
       const dayTable = []
-      for (let i = 0; i < latest; i++) {
+      for (let i = 0; i < furthestDueDate; i++) {
         dayTable.push([])
       }
 
-      for (let i = 0; i < assessments.length; i++) {
-        // dayTable[this.getDifferenceInDays(currentDate, new Date(assessments[i].dueDate))]
+      for (let i = 0; i < dayTable.length; i++) {
+        const uDay = unavailabilities[i % 7]
+        if (uDay) {
+          dayTable[i].push([this.parseStringTime(uDay.startTime),
+            this.parseStringTime(uDay.endTime)])
+        }
       }
+      console.log(dayTable)
     }
   }
 }
