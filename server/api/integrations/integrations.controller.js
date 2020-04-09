@@ -5,7 +5,7 @@ const request = require('request-promise')
 const moment = require('moment')
 const { createIssue } = require('../../modules/github')
 
-const CALENDAR_URL = 'http://events.rpi.edu/cal/misc/export.gdo?b=de'
+const CALENDAR_URL = 'https://events.rpi.edu/cal/misc/export.gdo?b=de'
 
 async function submitGitHubIssue (ctx) {
   const { title, description } = ctx.request.body
@@ -15,29 +15,27 @@ async function submitGitHubIssue (ctx) {
   ctx.ok({ message: 'Submitted issue to GitHub!' })
 }
 
+/**
+ * Get academic calendar events from the official RPI calendar.
+ *
+ * **Response JSON**
+ * - events: array of calendar events
+ */
 async function getAcademicCalendarEvents (ctx) {
-  // const response = await request.post(CALENDAR_URL, {
-  //   form: {
-  //     calPath: '/user/public-user/Academic Calendar',
-  //     nocache: 'no',
-  //     contentName: 'Academic Calendar.ics',
-  //     dateLimits: 'all'
-  //   }
-  // })
+  // Request events in ical format from RPI
+  const response = await request.post(CALENDAR_URL, {
+    followAllRedirects: true,
+    form: {
+      calPath: '/user/public-user/Academic Calendar',
+      nocache: 'no',
+      contentName: 'Academic Calendar.ics',
+      dateLimits: 'limited',
+      bwExportCalendarWidgetStartDate: moment(ctx.session.currentTerm.startDate).format('YYYY-MM-DD'),
+      bwExportCalendarWidgetEndDate: moment(ctx.session.currentTerm.endDate).format('YYYY-MM-DD')
+    }
+  })
 
-  const events = {}
-
-  // const parsed = ical.parseICS(response)
-  // for (const id in parsed) {
-  //   if (
-  //     moment(parsed[id].start).isBetween(
-  //       ctx.session.currentTerm.startDate,
-  //       ctx.session.currentTerm.endDate
-  //     )
-  //   ) {
-  //     events[id] = parsed[id]
-  //   }
-  // }
+  const events = ical.parseICS(response)
 
   return ctx.ok({ events })
 }

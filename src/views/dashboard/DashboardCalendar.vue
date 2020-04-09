@@ -218,6 +218,7 @@ export default {
     const events = []
     for (const id in parsed) {
       if (parsed[id].summary) {
+        // TODO: Split up multi-day events in separate all-day events
         events.push(this.mapICalObjectToEvent(id, parsed[id]))
       }
     }
