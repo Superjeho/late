@@ -409,21 +409,35 @@ export default {
       }
 
       for (let i = 0; i < dayTable.length; i++) {
+        // unavailabilities
         const uDay = unavailabilities[i % 7]
         if (uDay) {
           dayTable[i].push([this.parseStringTime(uDay.startTime),
             this.parseStringTime(uDay.endTime)])
         }
+      }
 
-        for (let j = 0; j < courses.length; j++) {
-          const periods = courses[j].periods
-          for (let k = 0; k < periods.length; k++) {
-            const period = periods[k]
-            if (period.day === i) {
-              dayTable[i].push([this.parseStringTime(period.startTime),
-                this.parseStringTime(period.endTime)])
-            }
+      // course blocks
+      for (let j = 0; j < courses.length; j++) {
+        const periods = courses[j].periods
+        for (let k = 0; k < periods.length; k++) {
+          const period = periods[k]
+          // handle repeating weeks
+          for (let l = period.day; l < dayTable.length; l += 7) {
+            dayTable[l].push([this.parseStringTime(period.startTime),
+              this.parseStringTime(period.endTime)])
           }
+        }
+      }
+
+      // scheduled assessment blocks
+      for (let i = 0; i < assessments.length; i++) {
+        const blocks = assessments[i]._blocks
+        for (let j = 0; j < blocks.length; j++) {
+          const startTime = new Date(blocks[j].startTime)
+          const endTime = new Date(blocks[j].endTime)
+
+          const dayIndex = this.getDifferenceInDays(new Date(), startTime)
         }
       }
 
