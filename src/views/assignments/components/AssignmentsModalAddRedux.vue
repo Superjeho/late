@@ -381,17 +381,14 @@ export default {
       if (typeof time !== 'string') {
         return time
       }
-      time.split(':')
-      return parseInt(time[0] + time[1])
+      return parseInt(time.split(':').join(''))
     },
+    /**
+     * Auto assign creates a table of all days between the current time and
+     * the latest assessment due date. It removes any 'used' time blocks and
+     * distributes the new assignment across the week.
+     */
     autoAssign () {
-      /*
-      to consider:
-       - Unavailability this.$store.state.unavailability.unavailabilities []
-       - Courses this.$store.state.schedule.courses []
-       - Assessments this.$store.state.assessments.upcomingAssessments []
-      */
-
       const unavailabilities = this.$store.state.unavailability.unavailabilities
       const courses = this.$store.state.schedule.courses
       const assessments = this.$store.state.assessments.upcomingAssessments
@@ -408,9 +405,10 @@ export default {
         dayTable.push([])
       }
 
+      const currentWeekDay = currentDate.getDay()
       for (let i = 0; i < dayTable.length; i++) {
         // unavailabilities
-        const uDay = unavailabilities[i % 7]
+        const uDay = unavailabilities[(i + currentWeekDay) % 7]
         if (uDay) {
           dayTable[i].push([this.parseStringTime(uDay.startTime),
             this.parseStringTime(uDay.endTime)])
@@ -423,7 +421,10 @@ export default {
         for (let k = 0; k < periods.length; k++) {
           const period = periods[k]
           // handle repeating weeks
-          for (let l = period.day; l < dayTable.length; l += 7) {
+          let dayOffset = period.day - currentDate.getDay()
+          if (dayOffset < 0) dayOffset += 7
+
+          for (let l = dayOffset; l < dayTable.length; l += 7) {
             dayTable[l].push([this.parseStringTime(period.startTime),
               this.parseStringTime(period.endTime)])
           }
@@ -437,12 +438,18 @@ export default {
           const startTime = new Date(blocks[j].startTime)
           const endTime = new Date(blocks[j].endTime)
 
-          const dayIndex = this.getDifferenceInDays(new Date(), startTime)
+          const dayIndex = this.getDifferenceInDays(currentDate, startTime)
+          dayTable[dayIndex].push([startTime.getHours() * 100 + startTime.getMinutes(),
+            endTime.getHours() * 100 + endTime.getMinutes()])
         }
       }
 
-      console.log(assessments)
-      console.log(dayTable)
+      // sort each day by starting time
+      for (let i = 0; i < dayTable.length; i++) {
+        dayTable[i].sort((a, b) => {
+          return a.startTime - b.startTime
+        })
+      }
     }
   }
 }
