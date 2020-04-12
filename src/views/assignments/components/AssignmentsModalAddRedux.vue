@@ -383,6 +383,9 @@ export default {
       }
       return parseInt(time.split(':').join(''))
     },
+    getIntTimeDif (a, b) {
+      return Math.abs(Math.floor(a / 100) - Math.floor(b / 100)) * 60 + Math.abs((a % 100) - (b % 100))
+    },
     /**
      * Auto assign creates a table of all days between the current time and
      * the latest assessment due date. It removes any 'used' time blocks and
@@ -444,12 +447,29 @@ export default {
         }
       }
 
-      // sort each day by starting time
+      // sort each day by starting time and find available slots
+      const available = []
+      for (let i = 0; i < dayTable.length; i++) {
+        available.push([])
+      }
+
       for (let i = 0; i < dayTable.length; i++) {
         dayTable[i].sort((a, b) => {
           return a.startTime - b.startTime
         })
+
+        // assumes there are no time block overlaps
+        const sorted = dayTable[i]
+        let next = 0
+        for (let j = 0; j < sorted.length; j++) {
+          if (this.getIntTimeDif(next, sorted[i][0]) >= 15) {
+            available[i].push([next, sorted[i][0]])
+            next = sorted[i][1]
+          }
+        }
       }
+
+      console.log(available)
     }
   }
 }
