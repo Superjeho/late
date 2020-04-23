@@ -15,6 +15,7 @@
   },
   "main": "index.js",
   "dependencies": {
+    "@datastructures-js/heap": "^2.0.0",
     "@fullcalendar/core": "^4.3.1",
     "@fullcalendar/daygrid": "^4.3.0",
     "@fullcalendar/interaction": "^4.3.0",

@@ -126,6 +126,8 @@ import ModalTitleAndDescription from '@/views/assessments/components/modal/Modal
 import ModalTime from '@/views/assessments/components/modal/ModalTime'
 import ModalScheduler from '@/views/assessments/components/modal/ModalScheduler'
 
+import { MinHeap, MaxHeap } from '@datastructures-js/heap'
+
 export default {
   name: 'AssignmentsModalAdd',
   components: {
@@ -398,9 +400,7 @@ export default {
 
       // find latest due date
       const currentDate = new Date()
-      const furthestDueDate = Math.max(...assessments.map(assessment => {
-        return this.getDifferenceInDays(currentDate, new Date(assessment.dueDate))
-      }))
+      const furthestDueDate = this.getDifferenceInDays(currentDate, new Date(this.dueDate()))
 
       // init day table
       const dayTable = []
@@ -453,6 +453,9 @@ export default {
         available.push([])
       }
 
+      // used to check if there's enough time to hold blocks
+      const timeHeap = new MaxHeap()
+
       for (let i = 0; i < dayTable.length; i++) {
         dayTable[i].sort((a, b) => {
           return a.startTime - b.startTime
@@ -462,14 +465,30 @@ export default {
         const sorted = dayTable[i]
         let next = 0
         for (let j = 0; j < sorted.length; j++) {
-          if (this.getIntTimeDif(next, sorted[i][0]) >= 15) {
+          const timeDif = this.getIntTimeDif(next, sorted[i][0])
+          if (timeDif >= 15) {
             available[i].push([next, sorted[i][0]])
             next = sorted[i][1]
+            // key is time amount, value is tuple showing specific locaition in availability table
+            timeHeap.insert(timeDif, (i, available[i].size() - 1))
           }
         }
       }
 
       console.log(available)
+
+      let timePerSession = 60
+      let totalTimeInMinutes = this.timeEstimate() * 60
+      const reccomendedSessions = Math.ceil(totalTimeInMinutes / timePerSession)
+
+      while (totalTimeInMinutes > 0) {
+        const timeTop = timeHeap.extractRoot()
+        if (timeTop.getKey() < timePerSession) {
+          timePerSession = timeTop.getKey()
+        }
+
+        totalTimeInMinutes -= timeTop.getKey()
+      }
     }
   }
 }
