@@ -470,7 +470,7 @@ export default {
             available[i].push([next, sorted[i][0]])
             next = sorted[i][1]
             // key is time amount, value is tuple showing specific locaition in availability table
-            timeHeap.insert(timeDif, (i, available[i].size() - 1))
+            timeHeap.insert(timeDif, [next, sorted[i][0]])
           }
         }
       }
@@ -487,7 +487,17 @@ export default {
           timePerSession = timeTop.getKey()
         }
 
-        totalTimeInMinutes -= timeTop.getKey()
+        const startDate = new Date()
+        startDate.setHours(Math.floor(timeTop.getValue()[0] / 100))
+        startDate.setMinutes(timeTop.getValue()[0] % 100)
+        const endDate = new Date(startDate.getTime() + timePerSession * 60000)
+        this.$store.dispatch('ADD_ASSESSMENT_BLOCK', {
+          assessment: assessments[assessments.length - 1],
+          start: startDate,
+          end: endDate
+        })
+
+        totalTimeInMinutes -= timePerSession
       }
     }
   }
