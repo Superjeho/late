@@ -400,7 +400,9 @@ export default {
 
       // find latest due date
       const currentDate = new Date()
-      const furthestDueDate = this.getDifferenceInDays(currentDate, new Date(this.dueDate()))
+      const furthestDueDate = this.getDifferenceInDays(currentDate, new Date(this.dueDate)) + 1
+
+      console.log(furthestDueDate)
 
       // init day table
       const dayTable = []
@@ -456,7 +458,15 @@ export default {
       // used to check if there's enough time to hold blocks
       const timeHeap = new MaxHeap()
 
+      console.log(dayTable)
+
       for (let i = 0; i < dayTable.length; i++) {
+        // if daytable[i] is empty, whole day is open
+        if (dayTable[i].length === 0) {
+          available[i].push([0, 23])
+          continue
+        }
+
         dayTable[i].sort((a, b) => {
           return a.startTime - b.startTime
         })
@@ -465,12 +475,12 @@ export default {
         const sorted = dayTable[i]
         let next = 0
         for (let j = 0; j < sorted.length; j++) {
-          const timeDif = this.getIntTimeDif(next, sorted[i][0])
+          const timeDif = this.getIntTimeDif(next, sorted[j][0])
           if (timeDif >= 15) {
-            available[i].push([next, sorted[i][0]])
+            available[i].push([next, sorted[j][0]])
             next = sorted[i][1]
             // key is time amount, value is tuple showing specific locaition in availability table
-            timeHeap.insert(timeDif, [next, sorted[i][0]])
+            timeHeap.insert(timeDif, [next, sorted[j][0]])
           }
         }
       }
@@ -478,7 +488,7 @@ export default {
       console.log(available)
 
       let timePerSession = 60
-      let totalTimeInMinutes = this.timeEstimate() * 60
+      let totalTimeInMinutes = this.timeEstimate * 60
       const reccomendedSessions = Math.ceil(totalTimeInMinutes / timePerSession)
 
       while (totalTimeInMinutes > 0) {
