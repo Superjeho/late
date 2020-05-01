@@ -388,6 +388,37 @@ export default {
     getIntTimeDif (a, b) {
       return Math.abs(Math.floor(a / 100) - Math.floor(b / 100)) * 60 + Math.abs((a % 100) - (b % 100))
     },
+    intToDate (i) {
+      const date = new Date()
+      date.setHours(Math.floor(i / 100))
+      date.setMinutes(i % 100)
+      return date
+    },
+    dateToInt (d) {
+      return d.getHours() * 100 + d.getMinutes()
+    },
+    splitAddTime (heap, start, end) {
+      let startDate = this.intToDate(start)
+      const endDate = this.intToDate(end)
+
+      while (startDate.getHours() < endDate.getHours() - 1) {
+        const newTime = new Date(startDate)
+        newTime.setHours(startDate.getHours() + 1)
+        if (newTime <= endDate) {
+          const startInt = this.dateToInt(startDate)
+          const endInt = this.dateToInt(newTime)
+          const timeDif = this.getIntTimeDif(startInt, endInt)
+          heap.insert(timeDif, [startInt, endInt])
+        }
+
+        startDate = newTime
+      }
+
+      if (startDate < endDate) {
+        heap.insert(this.getIntTimeDif(this.dateToInt(startDate), this.dateToInt(endDate)),
+          [this.dateToInt(startDate), this.dateToInt(endDate)])
+      }
+    },
     /**
      * Auto assign creates a table of all days between the current time and
      * the latest assessment due date. It removes any 'used' time blocks and
@@ -449,21 +480,13 @@ export default {
         }
       }
 
-      // sort each day by starting time and find available slots
-      const available = []
-      for (let i = 0; i < dayTable.length; i++) {
-        available.push([])
-      }
-
       // used to check if there's enough time to hold blocks
       const timeHeap = new MaxHeap()
-
-      console.log(dayTable)
 
       for (let i = 0; i < dayTable.length; i++) {
         // if daytable[i] is empty, whole day is open
         if (dayTable[i].length === 0) {
-          available[i].push([0, 23])
+          this.splitAddTime(timeHeap, 0, 2400)
           continue
         }
 
@@ -477,21 +500,24 @@ export default {
         for (let j = 0; j < sorted.length; j++) {
           const timeDif = this.getIntTimeDif(next, sorted[j][0])
           if (timeDif >= 15) {
-            available[i].push([next, sorted[j][0]])
-            next = sorted[i][1]
-            // key is time amount, value is tuple showing specific locaition in availability table
-            timeHeap.insert(timeDif, [next, sorted[j][0]])
+            this.splitAddTime(timeHeap, next, sorted[j][0])
+            next = sorted[j][1]
+          }
+
+          // add last time block
+          if (j === sorted.length - 1) {
+            this.splitAddTime(timeHeap, sorted[j][1], 2400)
           }
         }
       }
 
-      console.log(available)
+      console.log(timeHeap)
 
       let timePerSession = 60
       let totalTimeInMinutes = this.timeEstimate * 60
       const reccomendedSessions = Math.ceil(totalTimeInMinutes / timePerSession)
 
-      while (totalTimeInMinutes > 0) {
+      while (totalTimeInMinutes > 0 && timeHeap.size() > 0) {
         const timeTop = timeHeap.extractRoot()
         if (timeTop.getKey() < timePerSession) {
           timePerSession = timeTop.getKey()
