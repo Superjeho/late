@@ -386,7 +386,10 @@ export default {
       return parseInt(time.split(':').join(''))
     },
     getIntTimeDif (a, b) {
-      return Math.abs(Math.floor(a / 100) - Math.floor(b / 100)) * 60 + Math.abs((a % 100) - (b % 100))
+      const startTime = this.intToDate(a)
+      const endTime = this.intToDate(b)
+      const dif = Math.abs(this.intToDate(b).getTime() - this.intToDate(a).getTime())
+      return Math.floor(dif / 60000)
     },
     intToDate (i) {
       const date = new Date()
@@ -432,8 +435,6 @@ export default {
       // find latest due date
       const currentDate = new Date()
       const furthestDueDate = this.getDifferenceInDays(currentDate, new Date(this.dueDate)) + 1
-
-      console.log(furthestDueDate)
 
       // init day table
       const dayTable = []
@@ -486,7 +487,7 @@ export default {
       for (let i = 0; i < dayTable.length; i++) {
         // if daytable[i] is empty, whole day is open
         if (dayTable[i].length === 0) {
-          this.splitAddTime(timeHeap, 0, 2400)
+          this.splitAddTime(timeHeap, 0, 2359)
           continue
         }
 
@@ -498,15 +499,12 @@ export default {
         const sorted = dayTable[i]
         let next = 0
         for (let j = 0; j < sorted.length; j++) {
-          const timeDif = this.getIntTimeDif(next, sorted[j][0])
-          if (timeDif >= 15) {
-            this.splitAddTime(timeHeap, next, sorted[j][0])
-            next = sorted[j][1]
-          }
+          this.splitAddTime(timeHeap, next, sorted[j][0])
+          next = sorted[j][1]
 
           // add last time block
           if (j === sorted.length - 1) {
-            this.splitAddTime(timeHeap, sorted[j][1], 2400)
+            this.splitAddTime(timeHeap, sorted[j][1], 2359)
           }
         }
       }
