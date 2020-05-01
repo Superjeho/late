@@ -391,6 +391,9 @@ export default {
       const dif = Math.abs(this.intToDate(b).getTime() - this.intToDate(a).getTime())
       return Math.floor(dif / 60000)
     },
+    /**
+     * converts int time format to a date object (ie. 1430 -> new Date())
+     */
     intToDate (i) {
       const date = new Date()
       date.setHours(Math.floor(i / 100))
@@ -400,7 +403,10 @@ export default {
     dateToInt (d) {
       return d.getHours() * 100 + d.getMinutes()
     },
-    splitAddTime (heap, start, end) {
+    /**
+     * Given a max heap, start int, end int, divides into portions of 60 minutes and adds to heap
+     */
+    splitAddTime (heap, day, start, end) {
       let startDate = this.intToDate(start)
       const endDate = this.intToDate(end)
 
@@ -411,7 +417,7 @@ export default {
           const startInt = this.dateToInt(startDate)
           const endInt = this.dateToInt(newTime)
           const timeDif = this.getIntTimeDif(startInt, endInt)
-          heap.insert(timeDif, [startInt, endInt])
+          heap.insert(timeDif, [startInt, endInt, day])
         }
 
         startDate = newTime
@@ -419,7 +425,7 @@ export default {
 
       if (startDate < endDate) {
         heap.insert(this.getIntTimeDif(this.dateToInt(startDate), this.dateToInt(endDate)),
-          [this.dateToInt(startDate), this.dateToInt(endDate)])
+          [this.dateToInt(startDate), this.dateToInt(endDate), day])
       }
     },
     /**
@@ -487,7 +493,7 @@ export default {
       for (let i = 0; i < dayTable.length; i++) {
         // if daytable[i] is empty, whole day is open
         if (dayTable[i].length === 0) {
-          this.splitAddTime(timeHeap, 0, 2359)
+          this.splitAddTime(timeHeap, i, 0, 2359)
           continue
         }
 
@@ -499,12 +505,12 @@ export default {
         const sorted = dayTable[i]
         let next = 0
         for (let j = 0; j < sorted.length; j++) {
-          this.splitAddTime(timeHeap, next, sorted[j][0])
+          this.splitAddTime(timeHeap, i, next, sorted[j][0])
           next = sorted[j][1]
 
           // add last time block
           if (j === sorted.length - 1) {
-            this.splitAddTime(timeHeap, sorted[j][1], 2359)
+            this.splitAddTime(timeHeap, i, sorted[j][1], 2359)
           }
         }
       }
@@ -522,6 +528,7 @@ export default {
         }
 
         const startDate = new Date()
+        startDate.setDate(startDate.getDate() + timeTop.getValue()[2])
         startDate.setHours(Math.floor(timeTop.getValue()[0] / 100))
         startDate.setMinutes(timeTop.getValue()[0] % 100)
         const endDate = new Date(startDate.getTime() + timePerSession * 60000)
