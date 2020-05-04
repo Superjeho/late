@@ -68,8 +68,8 @@ export default {
           today: 'Today'
         },
         validRange: {
-          start: this.$store.getters.currentTerm.start,
-          end: this.$store.getters.currentTerm.end
+          start: this.$store.getters.currentTerm.startDate,
+          end: this.$store.getters.currentTerm.endDate
         }
       }
     }
@@ -100,10 +100,7 @@ export default {
       } catch (e) {
         this.loading = false
         failureCallback(e)
-        return this.$buefy.toast.open({
-          message: e.response.data.message,
-          type: 'is-danger'
-        })
+        return this.showError(e.response.data.message)
       }
       assessments.push(...request.data.assignments)
 
@@ -117,10 +114,7 @@ export default {
       } catch (e) {
         this.loading = false
         failureCallback(e)
-        return this.$buefy.toast.error({
-          message: e.response.data.message,
-          type: 'is-danger'
-        })
+        return this.showError(e.response.data.message)
       }
 
       assessments.push(...request.data.exams)

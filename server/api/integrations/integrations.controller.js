@@ -3,32 +3,41 @@ const SMS = require('../../integrations/sms')
 const ical = require('node-ical')
 const request = require('request-promise')
 const moment = require('moment')
+const { createIssue, getReleases } = require('../../modules/github')
 
 const CALENDAR_URL = 'http://events.rpi.edu/cal/misc/export.gdo?b=de'
 
+async function submitGitHubIssue (ctx) {
+  const { title, description } = ctx.request.body
+
+  // call function from github.js file
+  createIssue(ctx.state.user.rcs_id, title, description)
+  ctx.ok({ message: 'Submitted issue to GitHub!' })
+}
+
 async function getAcademicCalendarEvents (ctx) {
-  const response = await request.post(CALENDAR_URL, {
-    form: {
-      calPath: '/user/public-user/Academic Calendar',
-      nocache: 'no',
-      contentName: 'Academic Calendar.ics',
-      dateLimits: 'all'
-    }
-  })
+  // const response = await request.post(CALENDAR_URL, {
+  //   form: {
+  //     calPath: '/user/public-user/Academic Calendar',
+  //     nocache: 'no',
+  //     contentName: 'Academic Calendar.ics',
+  //     dateLimits: 'all'
+  //   }
+  // })
 
   const events = {}
 
-  const parsed = ical.parseICS(response)
-  for (const id in parsed) {
-    if (
-      moment(parsed[id].start).isBetween(
-        ctx.session.currentTerm.start,
-        ctx.session.currentTerm.end
-      )
-    ) {
-      events[id] = parsed[id]
-    }
-  }
+  // const parsed = ical.parseICS(response)
+  // for (const id in parsed) {
+  //   if (
+  //     moment(parsed[id].start).isBetween(
+  //       ctx.session.currentTerm.startDate,
+  //       ctx.session.currentTerm.endDate
+  //     )
+  //   ) {
+  //     events[id] = parsed[id]
+  //   }
+  // }
 
   return ctx.ok({ events })
 }
@@ -184,10 +193,24 @@ async function saveNotificationPreferences (ctx) {
   ctx.ok({ updatedUser: ctx.state.user })
 }
 
+/**
+ * Get the LATE repo's releases as a changelog.
+ *
+ * **Request Query**
+ * - page (optional) Page number for GitHub API (default 1)
+ */
+async function getChangelog (ctx) {
+  const response = await getReleases(ctx.query.page || 1)
+
+  ctx.ok({ releases: response.data })
+}
+
 module.exports = {
   getAcademicCalendarEvents,
   submitSMS,
   verifySMS,
   disableSMS,
-  saveNotificationPreferences
+  saveNotificationPreferences,
+  submitGitHubIssue,
+  getChangelog
 }

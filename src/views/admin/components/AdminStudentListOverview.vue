@@ -63,6 +63,7 @@
         <a
           class="button is-small"
           :href="'mailto:' + student.rcs_id + '@rpi.edu'"
+          :target="'_blank'"
         >
           Email
         </a>
@@ -149,9 +150,7 @@ export default {
   },
   methods: {
     async getStats () {
-      let request
-
-      request = await this.$http.get(`/students/${this.student._id}`, {
+      const request = await this.$http.get(`/students/${this.student._id}`, {
         params: { counts: true }
       })
       this.counts = request.data.counts
@@ -166,10 +165,7 @@ export default {
           updates
         )
       } catch (e) {
-        return this.$buefy.toast.open({
-          message: e.response.data.message,
-          type: 'is-danger'
-        })
+        return this.showError(e.response.data.message)
       }
 
       this.$emit('update-student', request.data.updatedStudent)
@@ -183,10 +179,7 @@ export default {
           try {
             await this.$http.delete('/students/' + this.student._id)
           } catch (e) {
-            return this.$buefy.toast.open({
-              message: e.response.data.message,
-              type: 'is-danger'
-            })
+            return this.showError(e.response.data.message)
           }
 
           this.$emit('delete-student', this.student._id)

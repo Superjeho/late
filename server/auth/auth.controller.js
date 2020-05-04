@@ -6,87 +6,11 @@ const Student = require('../api/students/students.model')
 const cas = require('../modules/cas')
 const google = require('../modules/google')
 
+const { getNameAndMajor } = require('../modules/directory')
+
 const { sendDiscordWebhookMessage } = require('../modules/webhooks')
 
 const { sendNewUserEmail } = require('../integrations/email')
-
-/**
- * Middleware that finds the student from the session 'cas_user' and
- * creates the student if it does not exist yet.
- *
- * @param {Koa context} ctx
- */
-async function loginStudent (ctx) {
-  let student = await Student.findOne().byUsername(
-    ctx.session.cas_user.toLowerCase()
-  )
-
-  const hasInviteCode = ctx.query.inviteCode === (process.env.INVITE_CODE || 'better-late-than-never')
-
-  if (student && !hasInviteCode) {
-    if (student.accountLocked) {
-      logger.info(`${student.rcs_id} tried to login to locked account`)
-      ctx.session = null
-      return ctx.redirect('/?waitlisted=1')
-    }
-
-    logger.info(`Logging in ${student.rcs_id}`)
-  } else if (student && hasInviteCode) {
-    student.accountLocked = false
-    logger.info(`${student.rcs_id} was invited and taken off waitlist`)
-  } else if (!student && hasInviteCode) {
-    student = Student({
-      rcs_id: ctx.session.cas_user
-    })
-    logger.info(`${student.rcs_id} was invited and registered`)
-  } else {
-    // TODO: CMS api to get personal info here
-    student = Student({
-      rcs_id: ctx.session.cas_user,
-      accountLocked: true // WAIT LIST
-    })
-    /*
-    logger.info(
-      `Creating and logging in new student with rcs_id: ${student.rcs_id}`
-    );
-    */
-    await student.save()
-    logger.info(
-      `Creating and adding new user to waitlist with rcs_id: ${student.rcs_id}`
-    )
-
-    if (process.env.NODE_ENV !== 'development') {
-      sendNewUserEmail(student.rcs_id)
-      sendDiscordWebhookMessage(`**${student.rcs_id}** has joined the waitlist!`) // may fail
-    }
-
-    ctx.session = null
-
-    return ctx.redirect('/?waitlisted=1')
-  }
-
-  student.lastLogin = new Date()
-  await student.save()
-
-  if (process.env.NODE_ENV !== 'development') {
-    try {
-      ctx.state.discordClient.guilds
-        .find(guild => guild.id === process.env.DISCORD_SERVER_ID)
-        .channels.find(channel => channel.name === 'log')
-        .send(`**${student.displayName}** *(${student.rcs_id})* has logged in.`)
-    } catch (e) {}
-  }
-
-  if (!student.setup.profile) {
-    ctx.query.redirectTo = '/account'
-  }
-
-  if (hasInviteCode) {
-    ctx.query.redirectTo += '?invited=1'
-  }
-
-  ctx.redirect(ctx.query.redirectTo || '/')
-}
 
 async function startGoogleAuth (ctx) {
   const googleAuth = google.createConnection()
@@ -221,7 +145,7 @@ async function discordAuth (ctx) {
 }
 
 module.exports = {
-  loginStudent,
+  // loginStudent,
   startGoogleAuth,
   googleAuth,
   startDiscordAuth,

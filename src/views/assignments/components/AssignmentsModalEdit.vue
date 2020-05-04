@@ -211,10 +211,10 @@ export default {
   },
   computed: {
     maxDate () {
-      return moment(this.currentTerm.end).format('YYYY-MM-DD')
+      return moment(this.currentTerm.endDate).format('YYYY-MM-DD')
     },
     minDate () {
-      return moment(this.currentTerm.start).format('YYYY-MM-DD')
+      return moment(this.currentTerm.startDate).format('YYYY-MM-DD')
     }
   },
   watch: {
@@ -258,11 +258,7 @@ export default {
         })
       } catch (e) {
         this.loading = false
-        this.$buefy.toast.open({
-          message: e.response.data.message,
-          type: 'is-danger'
-        })
-        return
+        return this.showError(e.response.data.message)
       }
 
       this.$emit('updated-assessment', updatedAssignment)

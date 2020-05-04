@@ -12,12 +12,13 @@ const Compress = require('koa-compress')
 
 const google = require('./modules/google')
 const moment = require('moment')
-
+const passport = require('koa-passport')
 // Start the Discord bot
 const discordClient = require('./integrations/discord').client
 
 const logger = require('./modules/logger')
 
+/* Setup Sentry which logs backend errors */
 const Sentry = require('@sentry/node')
 Sentry.init({
   dsn: process.env.NODE_ENV === 'production' ? 'https://8ee2afb35b1b4faab2e45b860ec36c38@sentry.io/1548265' : null,
@@ -38,6 +39,7 @@ app.use(Body({ multipart: true }))
 /* Adds useful ctx functions for API responses */
 app.use(Respond())
 
+/* Use compression for API responses to decrease size */
 app.use(Compress())
 
 app.keys = [process.env.SESSION_KEY]
@@ -46,9 +48,14 @@ app.keys = [process.env.SESSION_KEY]
 const CONFIG = {
   key: 'koa:sess',
   maxAge: 86400000,
+  // secure: true,
   renew: true
 }
 app.use(Session(CONFIG, app))
+
+/* Initialize Passport for authentication */
+app.use(passport.initialize())
+app.use(passport.session())
 
 /* Better security by default */
 app.use(Helmet())
@@ -62,7 +69,12 @@ app.use(Static('dist/'))
 const Student = require('./api/students/students.model')
 const Term = require('./api/terms/terms.model')
 app.use(async (ctx, next) => {
+  /* Every route passes through this middleware first! */
+
+  // Make the environment available to routes so we know if we are in development or production
   ctx.state.env = process.env.NODE_ENV
+
+  // Is this route for the API?
   ctx.state.isAPI = ctx.request.url.startsWith('/api')
 
   // If first request, get terms
@@ -74,44 +86,40 @@ app.use(async (ctx, next) => {
   if (
     ctx.state.env === 'development' ||
     !ctx.session.currentTerm ||
-    (ctx.session.currentTerm && moment().isAfter(ctx.session.currentTerm.end))
+    (ctx.session.currentTerm && moment().isAfter(ctx.session.currentTerm.endDate))
   ) {
     ctx.session.currentTerm = ctx.session.terms.find(t => t.isCurrent)
   }
 
-  if (ctx.session.cas_user) {
-    // Find the logged in user to make it available in all routes
-    ctx.state.user = await Student.findOne()
-      .byUsername(ctx.session.cas_user.toLowerCase())
-      .exec()
+  if (ctx.isAuthenticated()) {
+    // The user is logged in
 
     Sentry.configureScope((scope) => {
-      scope.setUser({ username: ctx.state.user ? ctx.state.user.rcs_id : ctx.session.cas_user })
+      scope.setUser({ username: ctx.state.user.rcs_id })
     })
 
     ctx.state.discordClient = discordClient
 
-    if (ctx.state.user) {
-      ctx.state.onBreak =
-        !ctx.session.currentTerm ||
-        !ctx.state.user.terms.includes(ctx.session.currentTerm.code)
+    // Is the user on break?
+    ctx.state.onBreak =
+      !ctx.session.currentTerm ||
+      !ctx.state.user.terms.includes(ctx.session.currentTerm.code)
 
-      // Create Google auth if logged in and setup
-      if (ctx.state.user && ctx.state.user.integrations.google.calendarID) {
-        const auth = google.createConnection()
-        auth.setCredentials(ctx.state.user.integrations.google.tokens)
-        ctx.state.googleAuth = auth
-      }
-    } else {
-      logger.error('User is NULL: ' + ctx.session.cas_user)
+    // Create Google auth if logged in and setup
+    if (ctx.state.user && ctx.state.user.integrations.google.calendarID) {
+      ctx.state.googleAuth = google.createAuth(ctx.state.user.integrations.google.tokens)
     }
   }
+
+  // Try to complete the route
   try {
     await next()
   } catch (e) {
+    // An uncaught error occurred at some point in the route!
     ctx.status = e.status || 500
-    logger.error(e)
+    logger.error(e.stack)
 
+    // Make sure request details for the error are sent to Sentry
     Sentry.withScope(scope => {
       scope.addEventProcessor(event => Sentry.Handlers.parseRequest(event, ctx.request))
       Sentry.captureException(e)
@@ -127,7 +135,7 @@ app.use(async (ctx, next) => {
   }
 })
 
-/* Router setup */
+/* All of the routes are set up in ./routes.js so we require and use them here */
 require('./routes')(router)
 app.use(router.routes())
 app.use(router.allowedMethods())

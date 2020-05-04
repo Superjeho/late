@@ -45,6 +45,14 @@ function checkLogin ($) {
   return $('title').text() !== 'User Login'
 }
 
+/**
+ * Given SIS credentials, attempt to login and return the cookie jar
+ * for further requests.
+ *
+ * @param {String} RIN String RIN of student
+ * @param {String} PIN String SIS password of student
+ * @returns jar Request jar
+ */
 async function loginToSIS (RIN, PIN) {
   const jar = request.jar()
 
@@ -70,14 +78,17 @@ async function loginToSIS (RIN, PIN) {
   })
 
   // TODO: validate login
-  if (!checkLogin($)) throw new Error(`Failed to login to SIS. Please check your credentials!`)
+  if (!checkLogin($)) throw new Error('Failed to login to SIS. Please check your credentials!')
 
   return jar
 }
 
-async function scrapeSISForRegisteredTerms (RIN, PIN) {
-  const jar = await loginToSIS(RIN, PIN)
-
+/**
+ * Determine what terms a student is registered for from SIS.
+ *
+ * @param {*} jar
+ */
+async function scrapeSISForRegisteredTerms (jar) {
   logger.info('Getting registered terms for student from SIS.')
 
   const termCodes = possibleTerms()
@@ -104,13 +115,12 @@ async function scrapeSISForRegisteredTerms (RIN, PIN) {
 /**
  * Given a student's id (their RIN) and their PIN,
  * login to SIS for them and navigate to their unofficial transcript
- * ...
+ * to get their name and major.
+ *
+ * @param {*} jar Request jar after logging in
+ * @returns Object with name object and major string
  **/
-async function scrapeSISForProfileInfo (RIN, PIN) {
-  // The cookie jar to persist the login session
-  // Must be used with each request
-  const jar = await loginToSIS(RIN, PIN)
-
+async function scrapeSISForProfileInfo (jar) {
   logger.info('Getting profile info for student from SIS.')
 
   const $ = await request({
@@ -149,12 +159,13 @@ async function scrapeSISForProfileInfo (RIN, PIN) {
  * Given a student's id (their RIN) and their PIN,
  * login to SIS for them and navigate to their shedule page
  * and simply grab the CRNs of each of their courses and forget their credentials.
- **/
-async function scrapeSISForCourseSchedule (RIN, PIN, term, studentID) {
-  // The cookie jar to persist the login session
-  // Must be used with each request
-  const jar = await loginToSIS(RIN, PIN)
-
+ *
+ * @param {*} jar Request jar after logging in
+ * @param {Object} term Term document
+ * @param {ObjectID} studentID ID of Student document to create Course documents
+ * @returns Array of unsaved Course documents
+ */
+async function scrapeSISForCourseSchedule (jar, term, studentID) {
   logger.info(`Getting courses for student ${studentID} from SIS.`)
 
   // Submit schedule form choosing the right term
@@ -219,8 +230,8 @@ async function scrapeSISForCourseSchedule (RIN, PIN, term, studentID) {
       termCode: term.code,
       summary,
       crn,
-      startDate: term.start,
-      endDate: term.classesEnd,
+      startDate: term.startDate,
+      endDate: term.classesEndDate,
       credits,
       links: [],
       periods: []
@@ -236,10 +247,10 @@ async function scrapeSISForCourseSchedule (RIN, PIN, term, studentID) {
           .find('td:nth-child(2)')
           .text()
           .split(' - ')
-        const start = moment(time[0], 'h:mm a', true).format('Hmm')
-        const end = moment(time[1], 'h:mm a', true).format('Hmm')
+        const startTime = moment(time[0], 'h:mm a', true).format('HH:mm')
+        const endTime = moment(time[1], 'h:mm a', true).format('HH:mm')
 
-        if (start === 'Invalid date') return
+        if (startTime === 'Invalid date') return
 
         const days = $(this)
           .find('td:nth-child(3)')
@@ -262,8 +273,8 @@ async function scrapeSISForCourseSchedule (RIN, PIN, term, studentID) {
         for (const day of days) {
           const period = {
             day,
-            start,
-            end,
+            startTime,
+            endTime,
             type: 'LEC',
             location
           }
@@ -275,8 +286,8 @@ async function scrapeSISForCourseSchedule (RIN, PIN, term, studentID) {
     course.periods = course.periods.sort((a, b) => {
       if (a.day > b.day) return 1
       else if (a.day < b.day) return -1
-      else if (parseInt(a.start) > parseInt(b.start)) return 1
-      else if (parseInt(a.start) < parseInt(b.start)) return -1
+      else if (a.startTime > b.startTime) return 1
+      else if (a.startTime < b.startTime) return -1
 
       return 0
     })
@@ -290,17 +301,12 @@ async function scrapeSISForCourseSchedule (RIN, PIN, term, studentID) {
 /**
  * Grab all the info for a particular course given the term and crn. It does not grab the proper period types though.
  *
- * @param {String} RIN A valid RIN
- * @param {String} PIN The matching SIS PIN
+ * @param {String} jar Request jar from logging in to SIS
  * @param {Object} term The term object for the course
  * @param {String} crn The CRN of the course
  * @returns {Object} The compiled course object with every required property set except _student and color.
  */
-async function scrapeSISForSingleCourse (RIN, PIN, term, crn) {
-  // The cookie jar to persist the login session
-  // Must be used with each request
-  const jar = await loginToSIS(RIN, PIN)
-
+async function scrapeSISForSingleCourse (jar, term, crn) {
   logger.info(`Getting course ${crn} for a student from SIS.`)
 
   // Submit schedule form choosing the right term
@@ -328,8 +334,8 @@ async function scrapeSISForSingleCourse (RIN, PIN, term, crn) {
 
   let periods = []
 
-  let startDate = moment(term.start)
-  let endDate = moment(term.end)
+  let startDate = moment(term.startDate)
+  let endDate = moment(term.endDate)
 
   $('table[summary="This table lists the scheduled meeting times and assigned instructors for this class.."]')
     .find('tr:not(:first-child)')
@@ -338,10 +344,10 @@ async function scrapeSISForSingleCourse (RIN, PIN, term, crn) {
         .find('td:nth-child(2)')
         .text()
         .split(' - ')
-      const start = moment(time[0], 'h:mm a', true).format('Hmm')
-      const end = moment(time[1], 'h:mm a', true).format('Hmm')
+      const startTime = moment(time[0], 'h:mm a', true).format('HH:mm')
+      const endTime = moment(time[1], 'h:mm a', true).format('HH:mm')
 
-      if (start === 'Invalid date') return
+      if (startTime === 'Invalid date') return
 
       const days = $(this)
         .find('td:nth-child(3)')
@@ -364,8 +370,8 @@ async function scrapeSISForSingleCourse (RIN, PIN, term, crn) {
       for (const day of days) {
         const period = {
           day,
-          start,
-          end,
+          startTime,
+          endTime,
           type: 'LEC',
           location
         }
@@ -377,8 +383,8 @@ async function scrapeSISForSingleCourse (RIN, PIN, term, crn) {
   periods = periods.sort((a, b) => {
     if (a.day > b.day) return 1
     else if (a.day < b.day) return -1
-    else if (parseInt(a.start) > parseInt(b.start)) return 1
-    else if (parseInt(a.start) < parseInt(b.start)) return -1
+    else if (a.startTime > b.startTime) return 1
+    else if (a.startTime < b.startTime) return -1
 
     return 0
   })
@@ -479,8 +485,8 @@ async function scrapePeriodTypesFromCRNs (termCode, courses) {
       const matchedPeriod = course.periods.find(
         p =>
           days.includes(p.day) &&
-          p.start === startTime.format('Hmm') &&
-          p.end === endTime.format('Hmm')
+          p.startTime === startTime.format('HH:mm') &&
+          p.endTime === endTime.format('HH:mm')
       )
 
       if (matchedPeriod) {
@@ -501,6 +507,7 @@ async function scrapePeriodTypesFromCRNs (termCode, courses) {
 }
 
 module.exports = {
+  loginToSIS,
   scrapeSISForRegisteredTerms,
   scrapeSISForProfileInfo,
   scrapeSISForCourseSchedule,

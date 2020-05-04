@@ -141,7 +141,7 @@ export default {
     canGoPrev () {
       return moment(this.startMoment)
         .subtract(1, 'week')
-        .isSameOrAfter(this.currentTerm.start, 'week')
+        .isSameOrAfter(this.currentTerm.startDate, 'week')
     },
     startMoment () {
       return moment(this.startDate, 'YYYY-MM-DD', true)
@@ -234,10 +234,7 @@ export default {
       } catch (e) {
         this.loading = false
         this.currentAssessments = []
-        return this.$buefy.toast.open({
-          message: e.response.data.message,
-          type: 'is-danger'
-        })
+        return this.showError(e.response.data.message)
       }
       const currentExams = request.data.exams.filter(e => e.passed) // Only get passed exams
 
@@ -251,10 +248,7 @@ export default {
       } catch (e) {
         this.loading = false
         this.currentAssessments = []
-        return this.$buefy.toast.open({
-          message: e.response.data.message,
-          type: 'is-danger'
-        })
+        return this.showError(e.response.data.message)
       }
 
       const currentAssignments = request.data.assignments.filter(e => e.passed) // Only get passed exams

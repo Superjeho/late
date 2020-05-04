@@ -66,6 +66,9 @@ const schema = new Schema(
       default: '23:00'
     },
     admin: { type: Boolean, default: false }, // Whether the user is an administrator or not and can therefore access the admin page
+    reportPreferences: {
+      enabled: { type: Boolean, default: false }
+    },
     notificationPreferences: {
       preWorkBlockReminders: {
         type: String,
@@ -184,12 +187,12 @@ schema.methods.getUserAssignments = function ({
 
   if (start) {
     query.dueDate = query.dueDate || {}
-    query.dueDate['$gte'] = moment(start, 'YYYY-MM-DD', true).toDate()
+    query.dueDate.$gte = moment(start, 'YYYY-MM-DD', true).toDate()
   }
 
   if (end) {
     query.dueDate = query.dueDate || {}
-    query.dueDate['$lte'] = moment(end, 'YYYY-MM-DD', true).toDate()
+    query.dueDate.$lte = moment(end, 'YYYY-MM-DD', true).toDate()
   }
 
   if (title) {
@@ -237,12 +240,12 @@ schema.methods.getExams = function (start, end, title, courseCRN) {
 
   if (start) {
     query.date = query.date || {}
-    query.date['$gte'] = moment(start, 'YYYY-MM-DD', true).toDate()
+    query.date.$gte = moment(start, 'YYYY-MM-DD', true).toDate()
   }
 
   if (end) {
     query.date = query.date || {}
-    query.date['$lte'] = moment(end, 'YYYY-MM-DD', true).toDate()
+    query.date.$lte = moment(end, 'YYYY-MM-DD', true).toDate()
   }
 
   if (title) {

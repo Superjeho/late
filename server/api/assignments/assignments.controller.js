@@ -6,6 +6,10 @@ const Assignment = require('./assignments.model')
 const Student = require('../students/students.model')
 const Unavailability = require('../unavailabilities/unavailabilities.model')
 
+const google = require('../../modules/google')
+
+const { generateDummyAssignment } = require('../../modules/dummydata')
+
 const sgMail = require('@sendgrid/mail')
 sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
@@ -132,8 +136,8 @@ async function getTermAssignments (ctx) {
             { termCode },
             {
               dueDate: {
-                $gte: term.start,
-                $lt: term.end
+                $gte: term.startDate,
+                $lt: term.endDate
               }
             }
           ]
@@ -187,7 +191,7 @@ async function setAssignmentCollaborators (ctx) {
   if (newStudents.length > 0 && process.env.NODE_ENV === 'production') {
     sgMail.send({
       to: newStudents.map(rcsID => rcsID + '@rpi.edu'),
-      from: 'LATE <thefrankmatranga@gmail.com>',
+      from: 'LATE <no-reply@late.work>',
       templateId: 'd-9c74c53a41fe4b868b7b10b241edcbba',
       dynamic_template_data: {
         sharer: ctx.state.user,
@@ -277,7 +281,7 @@ async function createAssignment (ctx) {
 
   // Limit to this semester
   if (
-    !due.isBetween(ctx.session.currentTerm.start, ctx.session.currentTerm.end)
+    !due.isBetween(ctx.session.currentTerm.startDate, ctx.session.currentTerm.endDate)
   ) {
     logger.error(
       `${
@@ -301,7 +305,7 @@ async function createAssignment (ctx) {
   }
   const newAssignment = new Assignment(assignmentData)
 
-  // AUTO WORK-BLOCK ALLOCATION
+  // AUTO assessment-block ALLOCATION
   // const openSchedule = compileWeeklyOpenSchedule(
   //   ctx.session.currentTerm,
   //   ctx.state.user
@@ -357,7 +361,7 @@ async function createAssignment (ctx) {
         }
 
         // For day of week of actual assignment
-        while (nextFirst.isBefore(ctx.session.currentTerm.classesEnd)) {
+        while (nextFirst.isBefore(ctx.session.currentTerm.classesEndDate)) {
           const recurringAssignment = new Assignment({
             ...assignmentData,
             _recurringOriginal: newAssignment._id,
@@ -415,35 +419,27 @@ async function createAssignment (ctx) {
  * @param {Koa context} ctx
  * @returns The updated assignment
  */
-async function editAssignment (ctx) {
+async function updateAssignment (ctx) {
   const assignmentID = ctx.params.assignmentID
   const updates = ctx.request.body
 
-  // const allowedProperties = [
-  //   '_id',
-  //   'title',
-  //   'description',
-  //   'dueDate',
-  //   'courseCRN',
-  //   'timeEstimate',
-  //   'priority'
-  // ];
+  const disallowedProperties = [
+    '_id',
+    'termCode',
+    '_student'
+  ]
 
-  // // Ensure no unallowed properties are passed to update
-  // if (Object.keys(updates).some(prop => !allowedProperties.includes(prop))) {
-  //   logger.error(
-  //     `Failed to update assignment for ${
-  //       ctx.state.user.rcs_id
-  //     } because of invalid update properties.`
-  //   );
-  //   return ctx.badRequest('Passed unallowed properties.');
-  // }
+  if (updates.completed && updates.completed !== ctx.state.assignment.completed) {
+    return ctx.badRequest('Do not use this route to change the completed status.')
+  }
+
+  disallowedProperties.forEach(prop => delete updates[prop])
 
   // Limit to this semester
   if (
     !moment(updates.dueDate).isBetween(
-      ctx.session.currentTerm.start,
-      ctx.session.currentTerm.end
+      ctx.session.currentTerm.startDate,
+      ctx.session.currentTerm.endDate
     )
   ) {
     logger.error(
@@ -457,8 +453,22 @@ async function editAssignment (ctx) {
   }
 
   // Update assignment
-  delete updates._student
   ctx.state.assignment.set(updates)
+
+  if ('dueDate' in updates) {
+    if (moment(updates.dueDate).isBefore(moment())) {
+      // Moved to the past
+      for (const reminder of ctx.state.assignment.reminders) {
+        reminder.sent = true
+      }
+    } else {
+      // Update reminders
+      for (const reminder of ctx.state.assignment.reminders) {
+        // Find newly adjusted
+        reminder.datetime = moment(updates.dueDate).subtract(reminder.count, reminder.unit)
+      }
+    }
+  }
 
   try {
     await ctx.state.assignment.save()
@@ -503,10 +513,34 @@ async function toggleAssignment (ctx) {
       ctx.state.assignment._blocks
         .filter(b => b.endTime <= ctx.state.assignment.completedAt)
         .reduce((acc, b) => acc + b.duration, 0) / 60 // MUST BE IN HOURS
+
+    // Cut short any current blocks
+    const ongoing = ctx.state.assignment._blocks.find(block => moment().isBetween(block.startTime, block.endTime))
+    if (ongoing) {
+      ongoing.endTime = new Date()
+      await ongoing.save()
+
+      if (ctx.state.user.integrations.google.calendarID) {
+        try {
+          await google.actions.patchEvent(ctx.state.user, ongoing._id, {
+            end: {
+              dateTime: ongoing.endTime
+            }
+          })
+        } catch (e) {
+          logger.error(
+            `Failed to patch GCal event for work block for ${
+              ctx.state.user.rcs_id
+            }: ${e}`
+          )
+        }
+      }
+    }
   }
   ctx.state.assignment.confirmed = true
 
   try {
+    await ctx.state.assignment.populate('_blocks')
     await ctx.state.assignment.save()
   } catch (e) {
     logger.error(`Failed to toggle assignment with ID ${assignmentID}: ${e}`)
@@ -683,6 +717,33 @@ async function deleteComment (ctx) {
   })
 }
 
+async function generateAssignments (ctx) {
+  // Make sure proper environment
+  if (process.env.NODE_ENV !== 'development') return ctx.forbidden('Must be in development mode to generate assignments.')
+  if (!ctx.state.user.admin) return ctx.forbidden('Must be an admin to generate assignments.')
+
+  const { startDate, endDate, count } = ctx.request.body
+  if (count < 0 || count > 30) {
+    return ctx.badRequest('Count must be between 0 and 30 (inclusive)')
+  }
+
+  const term = ctx.session.currentTerm
+  const courses = await ctx.state.user.getCoursesForTerm(term.code)
+
+  const generateAssessments = []
+  for (let i = 0; i < count; i++) {
+    const newAssignment = new Assignment({
+      _student: ctx.state.user._id,
+      ...generateDummyAssignment(courses, term.code, startDate, endDate)
+    })
+    await newAssignment.save()
+
+    generateAssessments.push(newAssignment)
+  }
+
+  ctx.created({ generateAssessments })
+}
+
 module.exports = {
   getAssignmentMiddleware,
   getTermAssignments,
@@ -692,8 +753,9 @@ module.exports = {
   setAssignmentCollaborators,
   createAssignment,
   toggleAssignment,
-  editAssignment,
+  updateAssignment,
   deleteAssignment,
   addComment,
-  deleteComment
+  deleteComment,
+  generateAssignments
 }

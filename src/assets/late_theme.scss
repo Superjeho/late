@@ -5,6 +5,12 @@
 $dark: #2e3b59;
 $primary: #70cad1;
 
+// Setup CSS Variables
+:root {
+  --dark-color: #2e3b59;
+  --primary-color: #70cad1;
+}
+
 // Setup $colors to use as bulma classes (e.g. 'is-twitter')
 $colors: (
   "white": (
@@ -52,5 +58,4 @@ $colors: (
 // Import Bulma and Buefy styles
 @import "~bulma";
 @import "~buefy/src/scss/buefy";
-@import "~bulma-steps/src/sass/index.sass";
 @import "~bulma-timeline";

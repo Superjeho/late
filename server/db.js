@@ -14,13 +14,14 @@ const dbURL = process.env.MONGODB_URI // This better be set...
 const connection = mongoose
   .connect(
     dbURL,
-    { useNewUrlParser: true }
+    { useNewUrlParser: true, useUnifiedTopology: true }
   )
   .then(() => {
     logger.info('Connected to MongoDB.')
   })
   .catch(err => {
     logger.error(`Failed to connect to MongoDB: ${err}`)
+    process.exit(1)
   })
 
 module.exports = {

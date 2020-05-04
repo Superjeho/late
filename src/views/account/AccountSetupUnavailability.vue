@@ -92,7 +92,7 @@
         time-format="h(:mm)t"
         :now-indicator="true"
         :event-render="eventRender"
-        :default-date="courses[0].startDate"
+        :default-date="courses.length > 0 ? courses[0].startDate : new Date()"
         @eventResize="eventChanged"
         @eventDrop="eventChanged"
         @eventClick="eventClick"
@@ -107,6 +107,14 @@
         @click="saveTimePreferencesAndContinue"
       >
         {{ saved ? '' : 'Save and ' }}Continue
+      </b-button>
+      <b-button
+        type="is-danger"
+        :leading="loading"
+        class="is-pulled-right margin-right"
+        @click="clearAllUnavailabilities"
+      >
+        Clear All
       </b-button>
     </template>
   </div>
@@ -236,7 +244,7 @@ export default {
       end = moment(end)
 
       this.$buefy.dialog.prompt({
-        message: `What are you doing ${start.format('h:mma')} to ${start.format(
+        message: `What are you doing ${start.format('h:mma')} to ${end.format(
           'h:mma'
         )} on ${start.format('dddd')}?`,
         confirmText: 'Add Block',
@@ -267,11 +275,7 @@ export default {
           unavailability
         )
       } catch (e) {
-        this.$buefy.toast.open({
-          message: e.response.data.message,
-          type: 'is-danger'
-        })
-        return
+        return this.showError(e.response.data.message)
       }
 
       this.$store.commit('SET_USER', request.data.updatedUser)
@@ -283,7 +287,8 @@ export default {
       try {
         await this.$store.dispatch(
           'UPDATE_UNAVAILABILITY',
-          { unavailabilityID: unavailability.id,
+          {
+            unavailabilityID: unavailability.id,
             updates: {
               startTime: moment(unavailability.start).format('HH:mm'),
               endTime: moment(unavailability.end).format('HH:mm'),
@@ -293,10 +298,7 @@ export default {
           }
         )
       } catch (e) {
-        this.$buefy.toast.open({
-          message: e.response.data.message,
-          type: 'is-danger'
-        })
+        this.showError(e.response.data.message)
         throw e
       }
     },
@@ -307,17 +309,10 @@ export default {
           unavailabilityEvent
         )
       } catch (e) {
-        this.$buefy.toast.open({
-          message: e.response.data.message,
-          type: 'is-danger'
-        })
+        this.showError(e.response.data.message)
       }
     },
     async saveTimePreferencesAndContinue () {
-      if (this.saved) {
-        this.$router.push({ name: 'setup-integrations' })
-        return
-      }
       this.loading = true
       let request
       try {
@@ -327,11 +322,9 @@ export default {
         })
       } catch (e) {
         this.loading = false
-        this.$buefy.toast.open({
-          type: 'is-danger',
-          message: e.response.data.message
-        })
+        return this.showError(e.response.data.message)
       }
+
       await this.$store.dispatch('SET_USER', request.data.updatedUser)
       // Notify user of success
       this.$buefy.toast.open({
@@ -341,10 +334,32 @@ export default {
       this.$router.push({ name: 'setup-integrations' })
       this.loading = false
       this.saved = true
+    },
+    clearAllUnavailabilities () {
+      this.$buefy.dialog.confirm({
+        message: 'Clear all unavailable times?',
+        onConfirm: async () => {
+          let request
+          try {
+            request = await this.$http.delete('/unavailabilities')
+            this.$store.commit('SET_UNAVAILABILITIES', [])
+            this.$buefy.toast.open({
+              type: 'is-success',
+              message: 'Cleared all unavailable times!'
+            })
+          } catch (e) {
+            this.loading = false
+            return this.showError(e.response.data.message)
+          }
+        }
+      })
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
+.margin-right {
+  margin-right: 1.5em;
+}
 </style>

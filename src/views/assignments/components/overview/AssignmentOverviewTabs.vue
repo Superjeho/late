@@ -20,12 +20,53 @@
             <span>Schedule</span>
             <span
               v-if="!assignment.completed && !fullyScheduled"
-              class="tag is-danger tooltip is-tooltip-right"
+              class="tag is-danger tooltip has-tooltip-right"
               data-tooltip="You haven't scheduled enough time to work on this!"
             >!</span>
           </a>
         </li>
         <li
+          class="tasks"
+          :class="{'is-active': tab === 'tasks'}"
+          @click="$emit('set-tab', 'tasks')"
+        >
+          <a>
+            <span
+              class="icon is-small"
+            ><i
+              class="fas fa-tasks"
+              aria-hidden="true"
+            /></span>
+            <span>Tasks</span>
+            <span
+              v-if="assignment.tasks && assignment.tasks.length > 0"
+              class="tag tooltip has-tooltip-right"
+              :class="tasksTagClass"
+              :data-tooltip="`Completed ${completedTasksLength} out of ${assignment.tasks.length} tasks`"
+            >{{ completedTasksLength }}/{{ assignment.tasks.length }}</span>
+          </a>
+        </li>
+        <li
+          v-if="!assignment.completed && !assignment.passed"
+          class="reminders"
+          :class="{'is-active': tab === 'reminders'}"
+          @click="$emit('set-tab', 'reminders')"
+        >
+          <a>
+            <span class="icon is-small">
+              <i class="fas fa-bell" />
+            </span>
+            <span>Reminders</span>
+            <span
+              v-if="assignment.reminders && assignment.reminders.length > 0"
+              class="tag is-dark comment-count"
+            >{{
+              assignment.reminders.length
+            }}</span>
+          </a>
+        </li>
+        <li
+          v-if="assignment.shared"
           class="comments"
           :class="{'is-active': tab === 'comments'}"
           @click="$emit('set-tab', 'comments')"
@@ -37,7 +78,7 @@
               class="fas fa-comments"
               aria-hidden="true"
             /></span>
-            <span>Comments</span>
+            <span>Discussion</span>
             <span
               v-if="hasComments"
               class="tag is-dark comment-count"
@@ -114,6 +155,8 @@ import AssessmentOverviewWorkSchedule from '@/views/assessments/components/overv
 import AssessmentOverviewRelated from '@/views/assessments/components/overview/AssessmentOverviewRelated'
 import AssignmentOverviewTabsSharedInfo from '@/views/assignments/components/overview/AssignmentOverviewTabsSharedInfo'
 import AssessmentOverviewWhiteboard from '@/views/assessments/components/overview/AssessmentOverviewWhiteboard'
+import AssessmentOverviewReminders from '@/views/assessments/components/overview/AssessmentOverviewReminders'
+import AssignmentOverviewTabsTasks from '@/views/assignments/components/overview/AssignmentOverviewTabsTasks'
 
 export default {
   name: 'AssignmentOverviewTabs',
@@ -122,7 +165,9 @@ export default {
     AssessmentOverviewWorkSchedule,
     AssessmentOverviewRelated,
     AssignmentOverviewTabsSharedInfo,
-    AssessmentOverviewWhiteboard
+    AssessmentOverviewWhiteboard,
+    AssessmentOverviewReminders,
+    AssignmentOverviewTabsTasks
   },
   props: {
     tab: {
@@ -163,14 +208,34 @@ export default {
     fullyScheduled () {
       return this.scheduledMinutes >= this.totalEstimatedMinutes
     },
+    completedTasksLength () {
+      return this.assignment.tasks.filter(t => t.completed).length
+    },
+    tasksTagClass () {
+      if (this.assignment.tasks.length === 0) return 'is-danger'
+      else if (this.assignment.tasks.length === this.completedTasksLength) return 'is-success'
+      return 'is-warning'
+    },
     componentName () {
       return {
         comments: 'AssessmentOverviewComments',
         schedule: 'AssessmentOverviewWorkSchedule',
         related: 'AssessmentOverviewRelated',
         'shared-info': 'AssignmentOverviewTabsSharedInfo',
-        whiteboard: 'AssessmentOverviewWhiteboard'
+        whiteboard: 'AssessmentOverviewWhiteboard',
+        reminders: 'AssessmentOverviewReminders',
+        tasks: 'AssignmentOverviewTabsTasks'
       }[this.tab]
+    }
+  },
+  watch: {
+    'assignment.tasks' (tasks) {
+      // If there are tasks, and they are now all completed, prompt the user to toggle the assignment
+      if (tasks.length > 0) {
+        if (tasks.filter(t => t.completed).length === this.assignment.tasks.length && this.assignment.completed === false) {
+          this.$emit('toggle-completed')
+        }
+      }
     }
   },
   methods: {
@@ -195,5 +260,6 @@ export default {
 
 .tag {
   margin-left: 3px;
+  padding: 5px;
 }
 </style>

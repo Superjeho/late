@@ -16,7 +16,7 @@
         class="timeline-item"
         :class="timelineItemClass(event)"
       >
-        <template v-if="event.eventType === 'work-block'">
+        <template v-if="event.eventType === 'assessment-block'">
           <router-link
             tag="div"
             class="timeline-marker is-icon"
@@ -49,7 +49,7 @@
             {{ timeFormat(event.start) }} to {{ timeFormat(event.end) }}
           </p>
           <p>
-            <template v-if="event.eventType === 'work-block'">
+            <template v-if="event.eventType === 'assessment-block'">
               {{
                 event.assessment.assessmentType === "assignment"
                   ? "Work on"
@@ -144,23 +144,28 @@ export default {
       }
     },
     timelineItemClass (event) {
-      if (moment(event.end).isSameOrBefore(this.rightNow)) {
+      let { start, end } = event
+      if (typeof start === 'string') {
+        start = moment(start, 'HH:mm', true)
+        end = moment(end, 'HH:mm', true)
+      }
+      if (moment(end).isSameOrBefore(this.rightNow)) {
         return 'is-primary'
-      } else if (moment(this.rightNow).isBetween(event.start, event.end)) {
+      } else if (moment(this.rightNow).isBetween(start, end)) {
         return 'is-warning'
       }
     },
     timelineItemTitle (event) {
       if (event.eventType === 'period') {
         return `${event.course.title} ${this.periodType(event.period.type)}`
-      } else if (event.eventType === 'work-block') {
+      } else if (event.eventType === 'assessment-block') {
         return `${event.course.title} ${event.assessment.assessmentType}`
       }
     },
     markerIcon (event) {
       if (event.eventType === 'period') {
         return 'fa-graduation-cap'
-      } else if (event.eventType === 'work-block') {
+      } else if (event.eventType === 'assessment-block') {
         return 'fa-clipboard-check'
       }
 

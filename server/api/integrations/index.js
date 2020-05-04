@@ -7,6 +7,8 @@ router.get('/academiccalendar', Ctrl.getAcademicCalendarEvents)
 router.post('/sms/submit', Ctrl.submitSMS)
 router.post('/sms/verify', Ctrl.verifySMS)
 router.delete('/sms', Ctrl.disableSMS)
+router.post('/githubissue', Ctrl.submitGitHubIssue)
+router.get('/changelog', Ctrl.getChangelog)
 
 router.post('/preferences', Ctrl.saveNotificationPreferences)
 

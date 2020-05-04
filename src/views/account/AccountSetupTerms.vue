@@ -61,7 +61,7 @@ export default {
       )
     },
     terms () {
-      return this.$store.state.schedule.terms.filter(term => moment(term.end).isAfter(this.rightNow))
+      return this.$store.state.schedule.terms.filter(term => moment(term.endDate).isAfter(this.rightNow))
     }
   },
   created () {
@@ -90,10 +90,7 @@ export default {
         })
       } catch (e) {
         this.loading = false
-        return this.$buefy.toast.open({
-          message: e.response.data.message,
-          type: 'is-danger'
-        })
+        return this.showError(e.response.data.message)
       }
 
       await this.$store.dispatch('SET_USER', request.data.updatedUser)

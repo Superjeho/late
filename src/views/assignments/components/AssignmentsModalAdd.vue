@@ -1,19 +1,19 @@
-<!--Modals: Add exam (2.0)-->
+<!--Modals: Add Assignment (2.0)-->
 <template>
   <b-modal
     has-modal-card
+    class="add-assignment-modal"
     :active="open"
-    class="add-exam-modal"
     @close="$emit('toggle-modal')"
   >
     <div class="modal-card">
       <header class="modal-card-head">
         <p class="modal-card-title">
-          Add Exam
+          Add Assignment
         </p>
       </header>
 
-      <div class="modal-card-body">
+      <section class="modal-card-body">
         <div class="tabs is-fullwidth">
           <ul>
             <li
@@ -46,34 +46,39 @@
           <Component
             :is="currentStep.component"
             class="component"
-            :assessment-type="'exam'"
+            :assessment-type="'assignment'"
             :courses="courses"
             :course-c-r-n="courseCRN"
             :title="title"
             :description="description"
-            :title-placeholder="'Exam title'"
+            :title-placeholder="'Assignment title'"
             :description-placeholder="
-              'Long description of the exam'
+              'Long description of the assignment'
             "
-            :date="date"
-            :time="time"
+            :date="dueDate"
+            :time="dueTime"
             :time-estimate="timeEstimate"
-            :priority-max="3"
+            :priority-max="5"
             :priority="priority"
+            :is-recurring="isRecurring"
+            :recurring-days="recurringDays"
+            :old-titles="oldTitles"
             @update-crn="setValue('courseCRN', $event)"
             @update-date="
-              setValue('date', $event);
+              setValue('dueDate', $event);
               nextStep();
             "
-            @update-time="setValue('time', $event.trim())"
+            @update-time="setValue('dueTime', $event.trim())"
             @update-title="setValue('title', $event.trim())"
             @update-description="setValue('description', $event.trim())"
             @update-time-estimate="setValue('timeEstimate', $event)"
             @update-priority="setValue('priority', $event)"
+            @update-is-recurring="setValue('isRecurring', $event)"
+            @update-recurring-days="setValue('recurringDays', $event)"
             @next-step="nextStep()"
           />
         </transition>
-      </div>
+      </section>
       <footer class="modal-card-foot modal-nav">
         <div
           v-if="step > 0"
@@ -84,7 +89,7 @@
         </div>
         <div
           class="modal-nav-button cancel"
-          @click="$emit('toggle-modal')"
+          @click="cancelClicked"
         >
           <h1>Cancel</h1>
         </div>
@@ -111,12 +116,12 @@
 import moment from 'moment'
 
 import ModalSelectCourse from '@/views/assessments/components/modal/ModalSelectCourse'
-import ModalTitleAndDescription from '@/views/assessments/components/modal/ModalTitleAndDescription'
 import ModalCalendar from '@/views/assessments/components/modal/ModalCalendar'
+import ModalTitleAndDescription from '@/views/assessments/components/modal/ModalTitleAndDescription'
 import ModalTime from '@/views/assessments/components/modal/ModalTime'
 
 export default {
-  name: 'ExamsModalAddRedux',
+  name: 'AssignmentsModalAdd',
   components: {
     ModalSelectCourse,
     ModalCalendar,
@@ -132,6 +137,8 @@ export default {
   data () {
     return {
       loading: false,
+      oldTitles: new Set(),
+      oldCRN: '',
       steps: [
         {
           label: 'Course',
@@ -139,12 +146,12 @@ export default {
           component: 'ModalSelectCourse'
         },
         {
-          label: 'Date',
+          label: 'Due Date',
           completed: false,
           component: 'ModalCalendar'
         },
         {
-          label: 'Basic Info',
+          label: 'Title & Details',
           completed: false,
           component: 'ModalTitleAndDescription'
         },
@@ -158,68 +165,95 @@ export default {
   },
   computed: {
     step () {
-      return this.$store.state.addExamModal.modalStep
+      return this.$store.state.addAssignmentModal.modalStep
     },
     currentStep () {
       return this.steps[this.step]
     },
     isComplete () {
-      if (!this.courseCRN || !this.title || !this.time || !this.date) {
+      if (!this.courseCRN || !this.title || !this.dueTime || !this.dueDate) {
         return false
       }
       return true
     },
     courseCRN () {
-      return this.$store.state.addExamModal.courseCRN
+      return this.$store.state.addAssignmentModal.courseCRN
     },
     course () {
       return this.$store.getters.getCourseFromCRN(this.courseCRN)
     },
-    date () {
-      return this.$store.state.addExamModal.date
+    dueDate () {
+      return this.$store.state.addAssignmentModal.dueDate
     },
-    time () {
-      return this.$store.state.addExamModal.time
+    dueTime () {
+      return this.$store.state.addAssignmentModal.dueTime
     },
     title () {
-      return this.$store.state.addExamModal.title
+      return this.$store.state.addAssignmentModal.title
     },
     description () {
-      return this.$store.state.addExamModal.description
+      return this.$store.state.addAssignmentModal.description
     },
     timeEstimate () {
-      return this.$store.state.addExamModal.timeEstimate
+      return this.$store.state.addAssignmentModal.timeEstimate
     },
     priority () {
-      return this.$store.state.addExamModal.priority
+      return this.$store.state.addAssignmentModal.priority
+    },
+    isRecurring () {
+      return this.$store.state.addAssignmentModal.isRecurring
+    },
+    recurringDays () {
+      return this.$store.state.addAssignmentModal.recurringDays
     },
     completedChecks () {
       return {
         ModalSelectCourse: this.courseCRN.length > 0,
-        ModalCalendar: !!this.date,
+        ModalCalendar: !!this.dueDate,
         ModalTitleAndDescription: this.title.length > 0,
         ModalTime: true
       }
     }
   },
+  watch: {
+    async course (newCourse) {
+      if (this.oldCRN === newCourse.crn) return
+
+      const request = await this.$http.get(
+        '/assignments?courseCRN=' + newCourse.crn
+      )
+
+      this.oldTitles = new Set(
+        request.data.assignments
+          .reverse()
+          .slice(0, 5)
+          .map(a => a.title)
+      )
+      this.oldCRN = newCourse.crn
+    }
+  },
   methods: {
+    cancelClicked () {
+      this.$store.commit('RESET_ADD_ASSIGNMENT_MODAL_VALUES')
+      this.$emit('toggle-modal')
+    },
     nextStep () {
-      this.$store.commit('SET_ADD_EXAM_MODAL_VALUES', {
+      this.$store.commit('SET_ADD_ASSIGNMENT_MODAL_VALUES', {
         modalStep: this.step + 1
       })
     },
     lastStep () {
-      this.$store.commit('SET_ADD_EXAM_MODAL_VALUES', {
+      this.$store.commit('SET_ADD_ASSIGNMENT_MODAL_VALUES', {
         modalStep: this.step - 1
       })
     },
     setStep (modalStep) {
-      this.$store.commit('SET_ADD_EXAM_MODAL_VALUES', {
+      this.$store.commit('SET_ADD_ASSIGNMENT_MODAL_VALUES', {
         modalStep
       })
     },
     setValue (property, value) {
-      this.$store.commit('SET_ADD_EXAM_MODAL_VALUES', {
+      this.$store.commit('SET_ADD_ASSIGNMENT_MODAL_VALUES', {
         [property]: value
       })
     },
@@ -227,77 +261,91 @@ export default {
       this.loading = true
 
       if (!this.isComplete) {
-        this.$buefy.toast.open({
-          type: 'is-danger',
-          message: 'Make sure you complete every step!'
-        })
-        return
+        return this.showError('Make sure you complete every step!')
       }
-
+      // Fix multiple assignments being add with same description
+      if (this.$store.state.assessments.upcomingAssessments.find(assessment => assessment.title === this.title && assessment.courseCRN === this.courseCRN && moment(assessment.dueDate).isSame(this.dueDate, 'day'))) {
+        // Allow user to cancel adding repeat assignment
+        if (!confirm("You've already added an assignment with this name. Do you still want to continue?")) {
+          this.$emit('toggle-modal')
+          return
+        }
+      }
       let request
       try {
-        request = await this.$http.post('/exams', {
+        request = await this.$http.post('/assignments', {
           title: this.title,
           description: this.description,
-          date: moment(
-            this.date.format('YYYY-MM-DD') + ' ' + this.time,
+          dueDate: moment(
+            this.dueDate.format('YYYY-MM-DD') + ' ' + this.dueTime,
             'YYYY-MM-DD HH:mm',
             true
           ).toDate(),
           courseCRN: this.courseCRN,
+          timeEstimate: this.timeEstimate,
           priority: this.priority,
-          timeEstimate: this.timeEstimate
+          isRecurring: this.isRecurring,
+          recurringDays: this.isRecurring ? this.recurringDays : undefined
         })
       } catch (e) {
-        this.$buefy.toast.open({
-          type: 'is-danger',
-          message: 'There was an error adding the exam. Please try again later.'
-        })
         this.loading = false
-        return
+        return this.showError('There was an error adding the assignment. Please try again later.')
       }
 
       // Update global state if they are not in the past
       if (
-        moment(request.data.createdExam.dueDate).isAfter(
+        moment(request.data.createdAssignment.dueDate).isAfter(
           moment().startOf('day')
         )
       ) {
         this.$store.dispatch(
           'ADD_UPCOMING_ASSESSMENT',
-          request.data.createdExam
+          request.data.createdAssignment
         )
+
+        if (request.data.recurringAssignments.length > 0) {
+          for (const a of request.data.recurringAssignments) {
+            this.$store.dispatch('ADD_UPCOMING_ASSESSMENT', a)
+          }
+        }
       }
 
       // Reset important fields
-      this.$store.commit('SET_ADD_EXAM_MODAL_VALUES', {
+      this.$store.commit('SET_ADD_ASSIGNMENT_MODAL_VALUES', {
         modalStep: 0,
         courseCRN: '',
         dueTime: '08:00',
         title: '',
         description: '',
-        timeEstimate: 5.0,
-        priority: 2
+        timeEstimate: 1.0,
+        priority: 3,
+        isRecurring: false
       })
 
       this.loading = false
 
+      // Close modal
       this.$emit('toggle-modal')
 
-      const message = `Added exam '${request.data.createdExam.title}' ${moment(
-        request.data.createdExam.date
-      ).fromNow()}.`
-
+      // Notify user
       this.$buefy.snackbar.open({
-        message,
+        message: `Added assignment '${
+          request.data.createdAssignment.title
+        }' due ${moment(request.data.createdAssignment.dueDate).fromNow()}${
+          request.data.recurringAssignments.length > 0
+            ? ' and ' +
+              request.data.recurringAssignments.length +
+              ' recurring assignments'
+            : ''
+        }.`,
         type: 'is-primary',
         position: 'is-bottom',
         actionText: 'View',
         duration: 7000,
         onAction: () => {
           this.$router.push({
-            name: 'exam-overview',
-            params: { examID: request.data.createdExam._id }
+            name: 'assignment-overview',
+            params: { assignmentID: request.data.createdAssignment._id }
           })
         }
       })
@@ -379,8 +427,8 @@ export default {
   flex-direction: row;
 }
 
-.add-exam-modal {
-  #add-exam-description {
+.add-assignment-modal {
+  #add-assignment-description {
     width: 100%;
     min-width: 100%;
     max-width: 500px;
@@ -391,7 +439,7 @@ export default {
   }
 
   transition: height 1s ease-in-out, left 0.5s ease-in-out;
-  #add-exam-time-estimate {
+  #add-assignment-time-estimate {
     width: 150px;
   }
 }

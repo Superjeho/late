@@ -34,7 +34,7 @@
               :open="addAssignmentModalExpanded"
               @toggle-modal="$store.commit('TOGGLE_ADD_ASSIGNMENT_MODAL')"
             />
-            <ExamsModalAddRedux
+            <ExamsModalAdd
               v-if="!onBreak"
               :open="addExamModalExpanded"
               @toggle-modal="$store.commit('TOGGLE_ADD_EXAM_MODAL')"
@@ -57,11 +57,8 @@
             <AnnouncementsModal
               :open="announcementsModalOpen"
               :announcements="announcements"
-              @close-modal="
-                $store.commit('SET_ANNOUNCEMENTS_MODEL_OPEN', false)
-              "
+              @close-modal="$store.commit('SET_ANNOUNCEMENTS_MODEL_OPEN', false)"
             />
-
             <SISMan />
             <StudyToolsTimerOverlay
               v-if="$route.path !== '/studytools'"
@@ -89,8 +86,8 @@ import moment from 'moment'
 import TheHeader from '@/views/components/TheHeader'
 import TheFooter from '@/views/components/TheFooter'
 import TheSidebar from '@/views/sidebar/components/TheSidebar'
-import AssignmentsModalAdd from '@/views/assignments/components/AssignmentsModalAddRedux'
-import ExamsModalAddRedux from '@/views/exams/components/ExamsModalAddRedux'
+import AssignmentsModalAdd from '@/views/assignments/components/AssignmentsModalAdd'
+import ExamsModalAdd from '@/views/exams/components/ExamsModalAdd'
 import CourseModal from '@/views/courses/components/CourseModal'
 import PinnedAnnouncements from '@/views/announcements/components/PinnedAnnouncements'
 import AnnouncementsModal from '@/views/announcements/components/AnnouncementsModal'
@@ -102,7 +99,9 @@ import SISMan from '@/views/sisman/components/SISMan'
 
 import account from '@/mixins/account'
 
+import sistext from '@/modules/sistext'
 import Konami from 'konami'
+// import reverse from '@/modules/konami'
 
 export default {
   name: 'LATE',
@@ -113,12 +112,11 @@ export default {
     TheSidebar,
     TheFooter,
     AssignmentsModalAdd,
-    ExamsModalAddRedux,
+    ExamsModalAdd,
     AnnouncementsModal,
     PinnedAnnouncements,
     StudyToolsTimerOverlay,
     SISMan
-
   },
   mixins: [account],
   data () {
@@ -180,7 +178,7 @@ export default {
       return this.$store.getters.isUserSetup
     },
     sistext () {
-      return '                                              ,\n                                         ,⌐"▄└⌠ *▄\n                                       ╓▀  ▓▌▄▀ j█▀▄\n                                   ╓≈══▀═≡w█╓█▌ ▄███▄,,,\n                                 Ö███████████▀▀╜▀╙\'`. ╖`▀▀%\n                                 ▀███▀▀▀└   ,,▄▄▄▄▄▄▄`¥▀ ║  ▀▄\n                             ▄#*╙   ,▄▄#▀▀▀╙└,,,,"%███    ▌  `▀\n                         ,═"  ▄▄A▀╙`       ²█▀▀▀▀█  "█▌   █⌐╙▄▄▀\n                          ╓═"▄#MªΦµ          ,www,  `╗█   ║▌ █▀A█\n                      ,  █   ,+═══╓ ╓    ` A\'     █ ▌ █▌  ▐█ A▄▄█▄\n                      M ║⌐         ██▀  j█└  ╓▓Ω▌▄▀▄⌐▄█▌   █ ║█▄▐█\\,\n                     ▐  █  α, █▌▓▄█▀^    ⁿ▀w*▀▀▀▀▄▀,╣███   █H▐██ █▌█\n                     ▀ ▓M  ╙w▄▀█▌█                .ª└███   █▌▐██ ███Γ\n                    ▐ .█        JH   , , ,▓▄   ▓       █   █▌║██Γ███⌐\n                    ▌ ║█    ╓⌐   ▀▄▄▀█▄▄██▀l▄A▀▄▀╙½,   █   █▌▓██Γ███\n                    M ╡▌   Φ█▄═╓,  "▀▀█▄▄Φ▀└,Φ█▀¿ ▀   ▐▌   █M███▌██▀\n                 ,▄▀⌐ ╫▌    ▀▌▀▄▄▄└``  ,▄▄A▀▄▀▄╨      ╢M   █▄█▀██▓\n               ▄▀└¿▐⌐ █▌      "≈,▀▀▀▀▀▀▄▄#▀▄▄█▀Ä╓^ ▄▄▄█    ██▌¥╖ ▀═╓\n            ⁿ` ,A▀▄▀⌐ ╙▌        ⁿ═▄▄▄▌▄▄▄██████╨▄▄████½█═  ███▌▄▄ ,  "` \'▄\n         ^   ▄▌╝▀└  ⌐   "*═w▄▄╓╓,,J██████████▄▄██▀▀▀└¬╙   \'╙███▄ ║▌^    ▄▀\n         `µ ∩█       ⁿwç                        ,,▄▄▄▄▄▄██████▀█▀   ,═\n          ▓ ╞║∩        ╓▄█▀▀▀▀█▓▀███████████████▀▀▄████████▀█▓▀   ▄▀\n          ╙▌ Φ▌     ,*2÷▄▄▄▄▄▄█▄▄▄▄███▄▄▄▄▄▄▄▄▄▄████████▀▄#▀⌠▄*▄▄▀\n           ▀▄ ▀▄⌐ :╓▓#▀▀"└"═▄ ▄ ,,,▄▄▄▄▄▄██████████#K╨═   ▀▀▄▄████\n            `¥▀           `*▐▌ "*╙▀▀▀▀▀▀▀▀▀▀█▀▀▀▀L      ▄█▐█████▄▀\n             ▐⌐w█      └ "¥, ;▄▄▀ %      .▄▀ ▄▀╓▄⌐  ▄/½▄█▄▌█▄███▀\n               ╙▀▀▀K▀▀▀▓▀w;,▄█   " "  " "*▄ª╙ #^ «Φ╨ª▀██▌█▌█▀▓█\n              ,^    `    `    ` ─ ¬┘ ⁿ  ╨ ▌═Φ░╓A└,Γ ,▓█▀██`▄█└\n              *  -.╓▄J⌠⌠⌠,⌠,`   ```""""*****ⁿⁿⁿΦ▄▄▄⌐ █▀Γ``\n                              ▌`█⌐▌  -└╙╙▀█▀▀█▀▀▀▀▀▀▀\n                             AW▄▄█        ▌,,▐,\n                            ` \'╙██▀      ▐██═ ▐▌,▀▄█▄,         ,▄▄▄▄▄w,\n                      ▄▀▄▄¥ ▀  ▀█▄      .M██▀,▀█ █▀▄█▐▄∩^▄^▄ ^└      ╔▄▄╓\n   ,▄▄ΦK¥═≡≡≤, ╓≈╓▄╖▄Ñ▄█╙▓ ▄╙▀██▀▄█      ▄ ▄█▌▄█⌐▌██▌██▄█▌▄██═⌐ ╓▄#▀▀▀▀██▓\n ▄▀⌠           ▐M║█⌐█▌▐█▄█ ▀██ ██ ▀     ▐▌  █ ▀█.██ ▄▀╓▌ ███<*╙▄▄▓█████▀▀\n └ " Ö╓▄╓║▀▀▀▀███▄ █Ü╙▄ ███▓▄▄▄███╓▌     ▌  ║█▄███▄╓█w╝▀,▄▄▄███████▀▀\n  Φ████▄▓▄█▌██▀▀▀█▌w█ ║▄,████████▀▀       ▀ ╙▄▄▄▄█▓▄████████▀▀▀└`\n    ╙▀▀██████████████▄▄▄████████▓Φ███▄▄▄▄▄▄███████████▄▄══¬\n               ,▄≤≡▀▀██▀▀▀███▀▀▀███▀▀▀▀████▀▀▀████▀▀▀▀▀███▄▄▄==¬¬  .\n           ^`   ^^\'          `     `└'
+      return sistext
     }
   },
   watch: {
@@ -197,11 +195,7 @@ export default {
   },
   async mounted () {
     if (this.$route.query.accountLocked) {
-      return this.$buefy.toast.open({
-        message: 'Your account has been locked by administrators.',
-        type: 'is-warning',
-        duration: 70000
-      })
+      return this.showError('Your account has been locked by administrators.')
     } else if (this.$route.query.invited) {
       this.$buefy.toast.open({
         message: 'Your invitation has been accepted!',
@@ -211,20 +205,21 @@ export default {
     }
 
     if (this.loggedIn) {
-      this.$ga.set({ userId: this.$store.start.auth.user._id })
+      this.$ga.set({ userId: this.user.id })
       // Check if time to reupdate from SIS
       if (!this.user.lastSISUpdate || moment().diff(this.user.lastSISUpdate, 'days') > 40) {
         this.$router.push({ name: 'account', query: { importFromSIS: true } })
       }
 
       Sentry.configureScope(function (scope) {
-        scope.setUser({ 'username': this.user.rcs_id })
+        scope.setUser({ username: this.user.rcs_id })
       })
     }
 
     const easterEgg = new Konami('http://www.shirleyannjackson.biz/')
+
     console.log(this.sistext)
-    console.log('%cBetter LATE than never!', 'font-weight: bold; text-align: center; font-size: 30px')
+    console.log('%cSIS MAN says never share your SIS password!', 'font-weight: bold; text-align: center; font-size: 30px')
   },
   methods: {
     onTourStop () {
@@ -241,47 +236,10 @@ export default {
 /*               Global Styles
 /* These styles will apply to the whole app. */
 /*-------------------------------------------*/
-* {
-  word-wrap: break-word;
-  outline: 0;
-}
 
 .is-fullwidth {
   width: 100%;
 }
-
-.header-title {
-  padding-bottom: 0px;
-  padding-left: 0px;
-  border-bottom-color: #dbdbdb;
-  border-bottom-style: solid;
-  border-bottom-width: 1px;
-}
-
-hgroup {
-  margin-bottom: 10px;
-}
-
-.header-description {
-  .instructions {
-    font-size: 1.2em;
-    .subtitle {
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-    li i {
-      width: 25px;
-      margin-right: 10px;
-    }
-  }
-}
-
-//Removes annoying outline around elements when clicked.
-// *:focus {
-//   outline: none;
-//   box-shadow: none !important;
-//   -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
-// }
 
 html,
 body {
@@ -310,6 +268,29 @@ body {
 
 section.section {
   padding: 1.5rem;
+
+  /*
+    There are two kinds of page titles. One is a simple title (with an optional subtitle)
+    and the other is a title inside page tabs.
+  */
+  .title:not(.main-title) {
+    padding: 0px;
+    padding-bottom: 5px;
+  }
+
+  .tabs .title {
+    margin: 0;
+  }
+
+  > .title:not(.main-title) {
+    border-bottom-color: #dbdbdb;
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+  }
+
+  > .subtitle {
+    color: #777;
+  }
 }
 
 @media only screen and (max-width: 1216px) {
@@ -370,14 +351,12 @@ section.section {
 .slide-left-enter,
 .slide-right-leave-active {
   opacity: 0;
-  -webkit-transform: translate(30px, 0);
   transform: translate(30px, 0);
   margin-right: -30px;
 }
 .slide-left-leave-active,
 .slide-right-enter {
   opacity: 0;
-  -webkit-transform: translate(-30px, 0);
   transform: translate(-30px, 0);
 }
 
@@ -396,14 +375,6 @@ section.section {
   opacity: 0;
 }
 
-.modal-content {
-  max-width: 800px;
-}
-
-.modal-content, .modal-card {
-  margin: 0;
-}
-
 .exam-event {
   font-weight: bold;
 }
@@ -418,17 +389,17 @@ footer.footer {
 
 // ------ FULLCALENDAR -------
 
+.fc-button-primary {
+  background-color: var(--dark-color);
+}
+
+.fc-button-active {
+  background-color: rgb(37, 48, 72) !important;
+}
+
 @media only screen and (max-width: 768px) {
   .fc-toolbar.fc-header-toolbar {
     flex-direction: column;
-  }
-}
-
-.work-block-event {
-  border-width: 3px !important;
-
-  .margin-left {
-    margin-left: 5px;
   }
 }
 
@@ -443,17 +414,23 @@ footer.footer {
       opacity: 1;
     }
   }
+
+  .corner {
+    opacity: 0.3;
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    font-size: 2.5em;
+  }
+
+  /* Give some spacing in .fc-time */
+  :not(.corner) {
+    margin-right: 2px;
+  }
 }
 
 .fc-content {
-  .remove-work-block {
-    display: none;
-    position: absolute;
-    right: 0;
-    top: 0;
-  }
-
-  .remove-work-block {
+  .delete {
     display: none;
     position: absolute;
     right: 0;
@@ -464,10 +441,14 @@ footer.footer {
   }
 
   &:hover {
-    .remove-work-block {
+    .delete {
       display: block;
     }
   }
 }
 
+/* UTILS */
+.is-clickable {
+  cursor: pointer;
+}
 </style>

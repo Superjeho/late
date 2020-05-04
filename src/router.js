@@ -131,6 +131,40 @@ const router = new Router({
       ]
     },
     {
+      path: '/study-groups',
+      component: () => import('@/views/studygroups/StudyGroups'),
+      children: [
+        {
+          path: '',
+          redirect: 'home'
+        },
+        {
+          path: 'home',
+          name: 'study-groups-home',
+          component: () => import('@/views/studygroups/StudyGroupsHome'),
+          meta: {
+            title: 'Study Groups'
+          }
+        },
+        {
+          path: 'create',
+          name: 'study-groups-create',
+          component: () => import('@/views/studygroups/StudyGroupsCreate')
+        },
+        {
+          path: 'join',
+          name: 'study-groups-join',
+          component: () => import('@/views/studygroups/StudyGroupsJoin')
+        }
+      ]
+    },
+    {
+      path: ':groupID',
+      name: 'study-groups-overview',
+      component: () =>
+        import('@/views/studygroups/StudyGroupsOverview')
+    },
+    {
       path: '/checklist',
       name: 'checklist',
       component: () => import('@/views/checklists/MoveInChecklist.vue'),
@@ -150,9 +184,19 @@ const router = new Router({
       path: '/about',
       name: 'about',
       meta: {
-        title: 'About'
+        title: 'About',
+        requiresAuth: false
       },
       component: () => import('@/views/TheAboutPage.vue')
+    },
+    {
+      path: '/changelog',
+      name: 'changelog',
+      meta: {
+        title: 'Changelog',
+        requiresAuth: false
+      },
+      component: () => import('@/views/changelog/TheChangelogPage.vue')
     },
     {
       path: '/coursework',
@@ -256,6 +300,14 @@ const router = new Router({
       meta: {
         cantViewOnBreak: true,
         requiresAuth: true
+      }
+    },
+    {
+      path: '/scheduling/plan',
+      name: 'schedule-planner',
+      component: () => import('@/views/scheduling/SchedulePlannerPage.vue'),
+      meta: {
+        title: 'Schedule Planner'
       }
     },
     {
@@ -395,6 +447,22 @@ const router = new Router({
             title: 'Admin Fun'
           },
           component: () => import('@/views/admin/components/AdminFun.vue')
+        },
+        {
+          path: 'poll',
+          name: 'admin-poll',
+          meta: {
+            title: 'Admin Poll'
+          },
+          component: () => import('@/views/admin/components/AdminPoll.vue')
+        },
+        {
+          path: 'development',
+          name: 'admin-development',
+          meta: {
+            title: 'Admin Dev Mode'
+          },
+          component: () => import('@/views/admin/components/AdminDevelopment.vue')
         }
       ]
     },
@@ -406,6 +474,15 @@ const router = new Router({
         requiresAuth: false
       },
       component: () => import('@/views/ThePrivacyPolicyPage.vue')
+    },
+    {
+      path: '/tos',
+      name: 'terms-of-service',
+      meta: {
+        title: 'LATE Terms of Service',
+        requiresAuth: false
+      },
+      component: () => import('@/views/TheTermsOfServicePage.vue')
     },
     {
       path: '*',
@@ -426,7 +503,15 @@ router.beforeEach(async (to, from, next) => {
     process.env.NODE_ENV === 'development' &&
     store.state.auth.isAuthenticated === null
   ) {
-    const rcsID = prompt('Log in as what user? (rcs_id) Leave blank to not login.')
+    let rcsID = localStorage.getItem('devUserRcsId')
+    if (rcsID === null) {
+      rcsID = prompt('Log in as what user? (rcs_id) Leave blank to not login.')
+      if (rcsID) {
+        localStorage.setItem('devUserRcsId', rcsID)
+      } else {
+        localStorage.removeItem('devUserRcsId')
+      }
+    }
 
     if (rcsID) {
       const response = await api.get('/students/loginas?rcs_id=' + rcsID)
@@ -451,6 +536,7 @@ router.beforeEach(async (to, from, next) => {
     }
     calls.concat([
       store.dispatch('GET_TODOS'),
+      store.dispatch('GET_POLLS', 'false'),
       store.dispatch('GET_ANNOUNCEMENTS'),
       store.dispatch('AUTO_UPDATE_NOW')
     ])

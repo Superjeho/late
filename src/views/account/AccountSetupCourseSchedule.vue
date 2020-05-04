@@ -27,7 +27,7 @@
         v-if="courses.length === 0"
         class="has-text-grey has-text-centered"
       >
-        Set your courses above.
+        Set your courses below.
       </p>
       <template v-else>
         <div class="tabs">
@@ -59,6 +59,50 @@
             <small
               class="has-text-grey"
             >{{ coursesWithoutOther.length }} total</small>
+            <span class="is-pulled-right">
+              <button
+                class="button"
+                @click="colorsModalOpen = true"
+              >
+                <span class="icon"><i class="fas fa-palette" /></span>
+                <span>Colors</span>
+              </button>
+              <b-modal
+                :active.sync="colorsModalOpen"
+                has-modal-card
+                trap-focus
+                aria-role="dialog"
+                aria-modal
+              >
+                <div
+                  class="modal-card"
+                  style="width: auto"
+                >
+                  <header class="modal-card-head">
+                    <p class="modal-card-title">Course Colors</p>
+                  </header>
+                  <section class="modal-card-body">
+                    <p>{{ hoverCourseTitle || 'Hover over a color!' }}</p>
+                    <input
+                      v-for="course in courses"
+                      :key="course.crn"
+                      type="color"
+                      :value="course.color"
+                      @change="updateCourseColor(course, $event.target.value)"
+                      @mouseover="hoverCourseTitle = course.title"
+                      @mouseleave="hoverCourseTitle = null"
+                    >
+                    <br>
+                    <input
+                      type="text"
+                      class="input"
+                      :value="courses.map(c => c.color).join(',')"
+                    >
+                  </section>
+                </div>
+              </b-modal>
+
+            </span>
           </h2>
           <AccountCourse
             v-for="c in coursesWithoutOther"
@@ -153,7 +197,9 @@ export default {
       tab: 'list',
       saved: false,
       loading: false,
+      colorsModalOpen: false,
       openedCourseID: '',
+      hoverCourseTitle: null,
       addingCustomCourse: false
     }
   },
@@ -211,8 +257,7 @@ export default {
           pin
         })
       } catch (e) {
-        this.$buefy.toast.open({ type: 'is-danger', message: e.response.data.message })
-        return
+        return this.showError(e.response.data.message)
       }
 
       this.$store.commit('SET_CREDENTIALS', { rin, pin })
@@ -229,8 +274,7 @@ export default {
       try {
         removedCourse = await this.$store.dispatch('REMOVE_COURSE', courseID)
       } catch (e) {
-        this.$buefy.toast.open({ message: e.response.data.message, type: 'is-danger' })
-        return
+        return this.showError(e.response.data.message)
       }
 
       this.$buefy.toast.open({ message: `Removed ${removedCourse.title}!`, type: 'is-success' })
@@ -249,11 +293,7 @@ export default {
         })
       } catch (e) {
         this.loading = false
-        this.$buefy.toast.open({
-          message: e.response.data.message,
-          type: 'is-danger'
-        })
-        return
+        return this.showError(e.response.data.message)
       }
 
       this.$store.commit('SET_COURSES', request.data.courses)
@@ -275,6 +315,21 @@ export default {
       })
 
       this.loading = false
+    },
+    async updateCourseColor (course, color) {
+      let updatedCourse
+      try {
+        updatedCourse = await this.$store.dispatch(
+          'UPDATE_COURSE',
+          {
+            courseID: course.id,
+            updates: { color }
+          }
+        )
+      } catch (e) {
+        const message = e.response ? e.response.data.message : e.message
+        this.showError(message)
+      }
     }
   }
 }

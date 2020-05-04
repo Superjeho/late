@@ -28,65 +28,112 @@ function createUrl (auth) {
     scope: scopes
   })
 }
+
+function createAuth (tokens) {
+  const auth = createConnection()
+  auth.setCredentials(tokens)
+  return auth
+}
+
 const scopes = ['https://www.googleapis.com/auth/calendar']
 
 const actions = {
-  async createEventFromWorkBlock (googleAuth, currentTerm, user, assessment, block) {
-    const { assessmentType } = assessment
+  /**
+   * Create a GCal event for a work/course/todo block
+   *
+   * @param {Student document} user
+   * @param {String} currentTermCode
+   * @param {Assignent/Exam/Course/Todo document} item
+   * @param {Block document} block
+   */
+  async createBlockEvent (user, termCode, item, block) {
     const calendar = google.calendar({
       version: 'v3',
-      auth: googleAuth
+      auth: createAuth(user.integrations.google.tokens)
     })
 
-    const assessmentURL = `${
-      process.env.BASE_URL
-    }/coursework/${assessmentType.charAt(0)}/${assessment._id}`
-    const course = await user.courseFromCRN(
-      currentTerm.code,
-      assessment.courseCRN
-    )
-    const capitalizedAssessmentType =
-    assessmentType === 'assignment' ? 'Assignment' : 'Exam'
+    let colorId, summary, description, source, extendedPrivateProperties
 
+    if (block.blockType === 'assessment') {
+      const assessment = item
+      const { assessmentType } = assessment
+
+      // Link to assessment
+      const assessmentURL = `${
+        process.env.BASE_URL
+      }/coursework/${assessmentType.charAt(0)}/${assessment._id}`
+
+      const capitalizedAssessmentType =
+      assessmentType === 'assignment' ? 'Assignment' : 'Exam'
+
+      colorId = assessment.assessmentType === 'assignment' ? 9 : 11
+      // Event title
+      summary = `${
+        assessment.assessmentType === 'assignment' ? 'Work on' : 'Study for'
+      } ${assessment.title}`
+
+      const course = await user.courseFromCRN(
+        termCode,
+        assessment.courseCRN
+      )
+
+      description = `<b>${
+        course.title
+      } ${capitalizedAssessmentType}</b> <i>${
+        assessment.title
+      }</i><br><blockquote>${assessment.description}</blockquote><br>${assessmentURL}`
+
+      source = {
+        title: assessment.title,
+        url: assessmentURL
+      }
+
+      extendedPrivateProperties = {
+        assessmentID: assessment._id
+      }
+    } else if (block.blockType === 'course') {
+      colorId = 10
+      summary = `Study for ${item.title}`
+      description = item.originalTitle
+      extendedPrivateProperties = {
+        courseID: item.id
+      }
+    } else if (block.blockType === 'todo') {
+      colorId = 9
+      summary = `Work on TODO ${item.text}`
+      description = 'TODO'
+      extendedPrivateProperties = {
+        todoID: item.id
+      }
+    }
+
+    // Make request to Google Calendar API to create event
     const request = await calendar.events.insert({
       calendarId: user.integrations.google.calendarID,
       requestBody: {
-        colorId: assessment.assessmentType === 'assignment' ? 9 : 11,
-        summary: `${
-          assessment.assessmentType === 'assignment' ? 'Work on' : 'Study for'
-        } ${assessment.title}`,
-        description: `<b>${
-          course.title
-        } ${capitalizedAssessmentType}</b> <i>${
-          assessment.title
-        }</i><br><blockquote>${assessment.description}</blockquote><br>${assessmentURL}`,
-        source: {
-          title: assessment.title,
-          url: assessmentURL
-        },
-        organizer: {
-          displayName: user.displayName,
-          email: user.rcs_id + '@rpi.edu'
-        },
-        locked: true,
+        colorId,
+        location: block.location,
+        summary,
+        description,
         guestsCanInviteOthers: false,
+        source,
         extendedProperties: {
           private: {
             scheduledByLATE: true,
-            assessmentID: assessment._id // links this event to the assessment
+            blockID: block.id, // Links this event to the block
+            ...extendedPrivateProperties // Links this event to the assessment
           }
         },
-        ...block.asGoogleCalendarEvent
+        ...block.asGoogleCalendarEvent // Start and end dates, etc.
       }
     })
 
-    logger.info(`Added GCal event for ${user.identifier}.`)
     return request.data
   },
-  async patchEventFromWorkBlock (googleAuth, user, blockID, updates) {
+  async patchEvent (user, blockID, updates) {
     const calendar = google.calendar({
       version: 'v3',
-      auth: googleAuth
+      auth: createAuth(user.integrations.google.tokens)
     })
     const request = await calendar.events.patch({
       calendarId: user.integrations.google.calendarID,
@@ -96,18 +143,41 @@ const actions = {
 
     return request.data
   },
-  async deleteEventFromWorkBlock (ctx, blockID) {
+  /**
+   * Delete a Google Calendar event from a student's connected calendar.
+   *
+   * @param {Object} googleIntegration Object with `calendarId` and `tokens`
+   * @param {String} eventId String ID of the GCal event to delete
+   */
+  async deleteEvent (user, eventId) {
+    const calendar = google.calendar({
+      version: 'v3',
+      auth: createAuth(user.integrations.google.tokens)
+    })
+
+    const request = await calendar.events.delete({
+      calendarId: user.integrations.google.calendarID,
+      eventId
+    })
+
+    return request.data
+  },
+  async deleteWorkBlockEventsForAssessment (ctx, assessment, cutoffDate) {
     const calendar = google.calendar({
       version: 'v3',
       auth: ctx.state.googleAuth
     })
 
-    const request = await calendar.events.delete({
-      calendarId: ctx.state.user.integrations.google.calendarID,
-      eventId: blockID
-    })
+    // const request = await calendar.events.delete({
+    //   calendarId: ctx.state.user.integrations.google.calendarID,
+    //   eventId: blockID
+    // })
 
-    logger.info(`Deleted work block GCal event for ${ctx.state.user.identifier}.`)
+    const request = await calendar.events.list({
+      calendarId: ctx.state.user.integrations.google.calendarID,
+      privateExtendedProperty: '',
+      timeMin: cutoffDate
+    })
 
     return request.data
   },
@@ -120,118 +190,121 @@ const actions = {
    * @param {array} courses The array of course objects to generate period events from
    */
   async createRecurringEventsFromCourseSchedule (googleAuth, calendarId, termCode, courses) {
-    const calendar = google.calendar({
-      version: 'v3',
-      auth: googleAuth
-    })
+    // TODO: fix bug
 
-    for (let i = 0; i < courses.length; i++) {
-      const course = courses[i]
+    // const calendar = google.calendar({
+    //   version: 'v3',
+    //   auth: googleAuth
+    // })
 
-      if (course.periods.length === 0) continue
+    // for (let i = 0; i < courses.length; i++) {
+    //   const course = courses[i]
 
-      // Determine if this was done already
-      logger.info('Conditionally creating course events for ' + course.title)
-      const request = await calendar.events.list({
-        calendarId,
-        privateExtendedProperty: [
-          'createdBy=LATE',
-          'termCode=' + termCode,
-          'courseID=' + course._id
-        ]
-      })
+    //   if (course.periods.length === 0) continue
 
-      const existingCourseCalendarEvents = request.data.items
+    //   // Determine if this was done already
+    //   logger.info('Conditionally creating course events for ' + course.title)
+    //   const request = await calendar.events.list({
+    //     calendarId,
+    //     privateExtendedProperty: [
+    //       'createdBy=LATE',
+    //       'termCode=' + termCode,
+    //       'courseID=' + course._id
+    //     ]
+    //   })
 
-      const orphanedEventIDs = existingCourseCalendarEvents.map(ev => ev.id).filter(eventID => !course.periods.id(eventID))
+    //   const existingCourseCalendarEvents = request.data.items
 
-      orphanedEventIDs.forEach(id => calendar.events.delete({
-        calendarId,
-        eventId: id
-      }))
+    //   const orphanedEventIDs = existingCourseCalendarEvents.map(ev => ev.id).filter(eventID => !course.periods.id(eventID))
 
-      const courseStart = moment(course.startDate)
-      const courseEnd = moment(course.endDate)
+    //   orphanedEventIDs.forEach(id => calendar.events.delete({
+    //     calendarId,
+    //     eventId: id
+    //   }))
 
-      for (const period of course.periods) {
-        const start = moment(
-          courseStart.format('YYYY-MM-DD') + ' ' + period.start,
-          'YYYY-MM-DD Hmm',
-          true
-        )
-        while (start.day() !== period.day) {
-          start.add(1, 'day')
-        }
+    //   const courseStart = moment(course.startDate)
+    //   const courseEnd = moment(course.endDate)
 
-        const end = moment(
-          start.format('YYYY-MM-DD') + ' ' + period.end,
-          'YYYY-MM-DD Hmm',
-          true
-        )
-        const recurrence = new RRule({
-          freq: RRule.WEEKLY,
-          byweekday: [RRule[dayAbbreviations[period.day]]],
-          until: courseEnd.toDate()
-        })
+    //   for (const period of course.periods) {
+    //     const start = moment(
+    //       courseStart.format('YYYY-MM-DD') + ' ' + period.start,
+    //       'YYYY-MM-DD HH:mm',
+    //       true
+    //     )
+    //     while (start.day() !== period.day) {
+    //       start.add(1, 'day')
+    //     }
 
-        const locationParts = period.location.split(' ')
-        const location =
-          `${locationParts.slice(0, locationParts.length - 1).join(' ')} #${locationParts[locationParts.length - 1]}, Troy, NY 12180`
+    //     const end = moment(
+    //       start.format('YYYY-MM-DD') + ' ' + period.end,
+    //       'YYYY-MM-DD HH:mm',
+    //       true
+    //     )
+    //     const recurrence = new RRule({
+    //       freq: RRule.WEEKLY,
+    //       byweekday: [RRule[dayAbbreviations[period.day]]],
+    //       until: courseEnd.toDate()
+    //     })
 
-        const data = {
-          id: period._id,
-          summary: `${course.title} ${periodTypes[period.type] ||
-            period.type}`,
-          description: `${course.summary} - ${course.sectionId} - ${
-            course.credits
-          } credits`,
-          location,
-          colorId: i % 12,
-          source: {
-            title: 'Course Page',
-            url: process.env.BASE_URL + '/account/courseschedule'
-          },
-          start: {
-            dateTime: start.toDate(),
-            timeZone: 'America/New_York'
-          },
-          end: {
-            dateTime: end.toDate(),
-            timeZone: 'America/New_York'
-          },
-          recurrence: [recurrence.toString()],
-          extendedProperties: {
-            private: {
-              createdBy: 'LATE',
-              termCode,
-              courseID: course._id, // links this event to the course
-              periodType: period.type,
-              periodID: period._id
-            }
-          }
-        }
+    //     const locationParts = period.location.split(' ')
+    //     const location =
+    //       `${locationParts.slice(0, locationParts.length - 1).join(' ')} #${locationParts[locationParts.length - 1]}, Troy, NY 12180`
 
-        const calendarEvent = existingCourseCalendarEvents.find(ev => ev.extendedProperties.private.periodID === period.id)
-        if (calendarEvent) {
-          await calendar.events.patch({
-            calendarId,
-            eventId: calendarEvent.id,
-            requestBody: data
-          })
-        } else {
-          await calendar.events.insert({
-            calendarId,
-            requestBody: data
-          })
-        }
-      }
-    }
+    //     const data = {
+    //       id: period._id,
+    //       summary: `${course.title} ${periodTypes[period.type] ||
+    //         period.type}`,
+    //       description: `${course.summary} - ${course.sectionId} - ${
+    //         course.credits
+    //       } credits`,
+    //       location,
+    //       colorId: i % 12,
+    //       source: {
+    //         title: 'Course Page',
+    //         url: process.env.BASE_URL + '/account/courseschedule'
+    //       },
+    //       start: {
+    //         dateTime: start.toDate(),
+    //         timeZone: 'America/New_York'
+    //       },
+    //       end: {
+    //         dateTime: end.toDate(),
+    //         timeZone: 'America/New_York'
+    //       },
+    //       recurrence: [recurrence.toString()],
+    //       extendedProperties: {
+    //         private: {
+    //           createdBy: 'LATE',
+    //           termCode,
+    //           courseID: course._id, // links this event to the course
+    //           periodType: period.type,
+    //           periodID: period._id
+    //         }
+    //       }
+    //     }
+
+    //     const calendarEvent = existingCourseCalendarEvents.find(ev => ev.extendedProperties.private.periodID === period.id)
+    //     if (calendarEvent) {
+    //       await calendar.events.patch({
+    //         calendarId,
+    //         eventId: calendarEvent.id,
+    //         requestBody: data
+    //       })
+    //     } else {
+    //       await calendar.events.insert({
+    //         calendarId,
+    //         requestBody: data
+    //       })
+    //     }
+    //   }
+    // }
   }
 }
 
 module.exports = {
   apis: google,
   createConnection,
+  createAuth,
   createUrl,
   actions
 }

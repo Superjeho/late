@@ -17,7 +17,8 @@ export default {
   data () {
     return {
       newCategory: '',
-      categories: []
+      categories: [],
+      loading: true
     }
   },
   computed: {
@@ -98,8 +99,8 @@ export default {
     weekLabels () {
       const weekLabels = []
 
-      const end = moment(this.currentTerm.end).endOf('week')
-      const current = moment(this.currentTerm.start).startOf('week')
+      const end = moment(this.currentTerm.endDate).endOf('week')
+      const current = moment(this.currentTerm.startDate).startOf('week')
 
       while (current.isBefore(end)) {
         weekLabels.push(current.format('[Week of] MMMM Do'))
@@ -111,8 +112,8 @@ export default {
     assignmentsDueOverTermDataset () {
       const data = []
 
-      const end = moment(this.currentTerm.end).endOf('week')
-      const current = moment(this.currentTerm.start).startOf('week')
+      const end = moment(this.currentTerm.endDate).endOf('week')
+      const current = moment(this.currentTerm.startDate).startOf('week')
 
       while (current.isBefore(end)) {
         const nextWeek = moment(current).add(1, 'week')

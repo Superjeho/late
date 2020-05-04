@@ -26,7 +26,7 @@ router.post(
 router.patch(
   '/a/:assignmentID',
   Ctrl.getAssignmentMiddleware,
-  Ctrl.editAssignment
+  Ctrl.updateAssignment
 )
 router.post(
   '/a/:assignmentID/toggle',
@@ -50,5 +50,7 @@ router.delete(
   Ctrl.getAssignmentMiddleware,
   Ctrl.deleteComment
 )
+
+router.post('/generate', Ctrl.generateAssignments)
 
 module.exports = router.routes()
