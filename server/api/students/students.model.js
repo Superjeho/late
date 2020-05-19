@@ -210,6 +210,7 @@ schema.methods.getUserAssignments = function ({
 
   return this.model('Assignment')
     .find(query)
+    .cache({ key: this.rcs_id })
     .populate({
       path: '_blocks',
       match: {
@@ -255,6 +256,7 @@ schema.methods.getExams = function (start, end, title, courseCRN) {
 
   return this.model('Exam')
     .find(query)
+    .cache({ key: this.rcs_id })
     .populate('_blocks')
     .populate('_student', '_id rcs_id name graduationYear integrations')
     .sort('date')
@@ -265,12 +267,14 @@ schema.methods.getExams = function (start, end, title, courseCRN) {
 schema.methods.getUnavailabilityForTerm = function (termCode) {
   return this.model('Unavailabiliy')
     .find({ _student: this._id, termCode })
+    .cache({ key: this.rcs_id })
     .exec()
 }
 
 schema.methods.getCoursesForTerm = function (termCode) {
   return this.model('Course')
     .find({ _student: this._id, termCode })
+    .cache({ key: this.rcs_id })
     .exec()
 }
 

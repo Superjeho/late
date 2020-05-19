@@ -32,6 +32,7 @@ const router = new Router()
 
 /* Connect to MongoDB database */
 require('./db')
+require('./modules/cache')
 
 /* Body Parser Setup */
 app.use(Body({ multipart: true }))

@@ -75,3 +75,5 @@ test.js
 *.ics
 
 .idea/
+
+*.rdb

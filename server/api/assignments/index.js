@@ -1,10 +1,12 @@
 const Router = require('koa-router')
 const router = new Router()
 
+const { clearCacheMiddleware } = require('../../modules/cache')
+
 const Ctrl = require('./assignments.controller')
 
 router.get('/', Ctrl.getAssignments)
-router.post('/', Ctrl.createAssignment)
+router.post('/', clearCacheMiddleware, Ctrl.createAssignment)
 
 router.get('/term/:termCode', Ctrl.getTermAssignments)
 
